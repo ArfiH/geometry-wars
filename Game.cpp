@@ -1,6 +1,9 @@
 #include "Game.h"
 
 #include <iostream>
+#include <cstdlib> // For rand() and srand()
+#include <ctime>   // For time()
+#include <fstream>
 
 Game::Game(const std::string &config) {
     init(config);
@@ -9,21 +12,70 @@ Game::Game(const std::string &config) {
 void Game::init(const std::string &path) {
     // TODO: read in config file here
     //       use the pre made PlayerConfig, EnemyConfig, BulletConfig variables
+    const int FRAME_LIMT = 60;
+    
+    const std::string filePath = "../" + path;     
+    std::ifstream file(filePath);
+    if (!file.is_open()) {
+        std::cerr << "Error: Could not open the file." << std::endl;
+        return;
+    }
+    
+    unsigned int wWidth, wHeight, frameLimit;
+    bool isFullscreen = 0;
+
+
+    std::string temp;
+    while (file >> temp) {
+        if (temp == "Window") {
+            file >> wWidth >> wHeight >> frameLimit;
+            file >> isFullscreen;
+        }
+        else if (temp == "Font") {
+            file >> temp;
+            if (!m_font.openFromFile("../" + temp))
+            {
+                std::cerr << "Could not open font file.\n";
+                return;
+            }
+            file >> m_textSize;
+            file >> m_textR >> m_textG >> m_textB;
+        }
+        else if (temp == "Player") {
+            file >> m_playerConfig.SR >> m_playerConfig.CR;
+            file >> m_playerConfig.S;
+            file >> m_playerConfig.FR >> m_playerConfig.FG >> m_playerConfig.FB >> m_playerConfig.OR >> m_playerConfig.OG >> m_playerConfig.OB >> m_playerConfig.OT >> m_playerConfig.V;
+        }
+        else if (temp == "Enemy") {
+            file >> m_enemyConfig.SR >> m_enemyConfig.CR >> m_enemyConfig.SMIN >> m_enemyConfig.SMAX >> m_enemyConfig.OR >> m_enemyConfig.OG >> m_enemyConfig.OB >> m_enemyConfig.OT >> m_enemyConfig.VMIN >> m_enemyConfig.VMAX >> m_enemyConfig.L >> m_enemyConfig.SI;
+        }
+        else if (temp == "Bullet") {
+            file >> m_bulletConfig.SR >> m_bulletConfig.CR >> m_bulletConfig.S >> m_bulletConfig.FR >> m_bulletConfig.FG >> m_bulletConfig.FB >> m_bulletConfig.OR >> m_bulletConfig.OG >> m_bulletConfig.OB >> m_bulletConfig.OT >> m_bulletConfig.V >> m_bulletConfig.L;
+        }
+    }
+
+    // Close the file stream manually (or let the destructor handle it)
+    file.close();
 
     // set up default window parameters
-    m_window.create(
-        sf::VideoMode({1280u, 720u}),
-        "Assignment 2"
-    );
-    m_window.setFramerateLimit(60);
+    m_window.create(sf::VideoMode({wWidth, wHeight}), "Assignment 2", isFullscreen);
 
-    ImGui::SFML::Init(m_window);
+    // sf::RenderWindow m_window(sf::VideoMode({1280, 720}), "Assignment 2");
+    m_window.setFramerateLimit(FRAME_LIMT); // limit frame rate to 60 fps
+
+    // initialize IMGUI and create a clock used for its internal timing
+    if (!ImGui::SFML::Init(m_window))
+    {
+        std::cerr << "Failed to initialize ImGui-SFML\n";
+        return;
+    }
 
     // scale the imgui ui and text size by 2
     ImGui::GetStyle().ScaleAllSizes(2.0f);
     ImGui::GetIO().FontGlobalScale = 2.0f;
 
     spawnPlayer();
+    spawnEnemy();
 }
 
 void Game::run() {
@@ -31,6 +83,10 @@ void Game::run() {
     // - add pause functionality in here
     // - some systems should function while paused (rendering)
     // - some systems shouldn't (movement / input)
+    
+    // Seed the generator with the current time so it changes every run
+    std::srand(std::time(nullptr)); 
+
     while (m_running)
     {
         // update the entity manager
@@ -50,6 +106,7 @@ void Game::run() {
         // may need to be moved when pause implemented
         m_currentFrame++;
     }
+    ImGui::SFML::Shutdown();
 }
 
 void Game::setPaused(bool paused) {
@@ -68,8 +125,10 @@ void Game::spawnPlayer() {
     entity->cTransform = std::make_shared<CTransform>(Vec2(200.0f, 200.0f), Vec2(1.0f, 1.0f), 0.0f);
 
     // The entity's shape will have radius 32, 8 sides, dark grey fill, and red outline of thickness 4
-    entity->cShape = std::make_shared<CShape>(32.0f, 8, sf::Color(10, 10, 10), sf::Color(255, 0, 0), 4.0f);
+    // entity->cShape = std::make_shared<CShape>(32.0f, 8, sf::Color(10, 10, 10), sf::Color(255, 0, 0), 4.0f);
 
+    entity->cShape = std::make_shared<CShape>(m_playerConfig.SR, m_playerConfig.V, sf::Color(m_playerConfig.FR, m_playerConfig.FG, m_playerConfig.FB), sf::Color(m_playerConfig.OR, m_playerConfig.OG, m_playerConfig.OB), m_playerConfig.OT);
+    
     // Add an input component to the player so that we can use inputs
     entity->cInput = std::make_shared<CInput>();
 
@@ -84,10 +143,25 @@ void Game::spawnEnemy() {
     // make sure the enemy is spawned properly with the m_enemyConfig variables
     // the enemy must be spawned completely within the bounds of the window
 
-    // auto e = m_entities.addEntity("enemy");
-    // e->cTransform = std::make_shared<CTransform>(args);
-    // e->cShape = std::make_shared<CShape>(args);
+    auto e = m_entities.addEntity("enemy");
 
+    const int SCREEN_OFFSET = 47;
+    const int MAX_POINT_COUNT = 8;
+    int randomX = (std::rand() % (1280 - SCREEN_OFFSET)) + SCREEN_OFFSET; 
+    int randomY = (std::rand() % (720 - SCREEN_OFFSET)) + SCREEN_OFFSET; 
+    int randPointCount = (std::rand() % m_enemyConfig.VMAX) + m_enemyConfig.VMIN;
+    // std::cerr << "Random: " << randomX << ' ' << randomY << '\n';
+    float minSpeed = m_enemyConfig.SMIN;
+    float maxSpeed = m_enemyConfig.SMAX;
+    float randSpeed = (std::rand() % (int)minSpeed) + maxSpeed;
+
+    sf::Color enemyColor = sf::Color(m_enemyConfig.OR, m_enemyConfig.OG, m_enemyConfig.OB);
+    // apply random color to each enemy
+    sf::Color randEnemyColor = sf::Color(std::rand() % 256, std::rand() % 256, std::rand() % 256);
+
+    e->cTransform = std::make_shared<CTransform>(Vec2(randomX, randomY), Vec2(randSpeed, randSpeed), 0.0f);
+    e->cShape = std::make_shared<CShape>(m_enemyConfig.SR, randPointCount, randEnemyColor, enemyColor, m_enemyConfig.OT);
+    e->cCollision = std::make_shared<CCollision>(m_enemyConfig.CR);
     // record when the most recent enemy was spawned
     m_lastEnemySpawnTime = m_currentFrame;
 }
@@ -100,6 +174,16 @@ void Game::spawnSmallEnemies(std::shared_ptr<Entity> e) {
     // - spawn a number of small enemies equal to the vertices of the original enemy
     // - set each small enemy to the same color as the original, half the size
     // - small enemies are worth double points of the original enemy
+
+    int n = e->cShape->circle.getPointCount();
+    std::vector<std::pair<float, float> > direction = {{-1, -1}, {-1, 1}, {1, -1}, {1, 1}};
+
+    for (size_t i = 0; i < n; i++) {
+        auto smallE = m_entities.addEntity("smallEnemy");
+        smallE->cTransform = std::make_shared<CTransform>(e->cTransform->pos, Vec2(3.f * direction[i % 4].first, 3.f * direction[i % 4].second), 0.0f);
+        smallE->cShape = std::make_shared<CShape>(m_enemyConfig.SR / 2.f, n, e->cShape->circle.getFillColor(), e->cShape->circle.getOutlineColor(), m_enemyConfig.OT);
+        smallE->cCollision = std::make_shared<CCollision>(m_enemyConfig.CR);
+    }
 }
 
 // spawns a bullet from a given entity to a target location
@@ -107,6 +191,19 @@ void Game::spawnBullet(std::shared_ptr<Entity> entity, const Vec2 &target) {
     // TODO: implement the spawning of a bullet which travels toward target
     // - bullet speed is given as a scalar speed
     // - you must set the velocity by using formula in notes
+    const int BULLET_SPEED = m_bulletConfig.S;
+    auto bullet = m_entities.addEntity("bullet");
+    bullet->cTransform = std::make_shared<CTransform>(m_player->cTransform->pos, Vec2(3, 3), 0.f);
+    bullet->cShape = std::make_shared<CShape>(m_bulletConfig.SR, m_bulletConfig.V, sf::Color(m_bulletConfig.FR, m_bulletConfig.FG, m_bulletConfig.FB), sf::Color(m_bulletConfig.OR, m_bulletConfig.OG, m_bulletConfig.OB), 0.0f); 
+    bullet->cCollision = std::make_shared<CCollision>(m_bulletConfig.CR);
+    // originate the bullet from the center of entity and move towards target
+    Vec2 normalizedVelocity = target;
+    normalizedVelocity -= bullet->cTransform->pos;
+    normalizedVelocity /= normalizedVelocity.length();
+    // std::cerr << "normalizedVelocity: " << normalizedVelocity.x << " " << normalizedVelocity.y << '\n';
+
+    bullet->cTransform->velocity.x = BULLET_SPEED * normalizedVelocity.x;
+    bullet->cTransform->velocity.y = BULLET_SPEED * normalizedVelocity.y;
 }
 
 void Game::spawnSpecialWeapon(std::shared_ptr<Entity> entity) {
@@ -117,14 +214,52 @@ void Game::sMovement() {
     // TODO: implement all entity movement in this function
     // you should read the m_player->cInput component to determine if the player is moving
     // sample:
-    for (auto e: m_entities.getEntities())
+
+    // Sample player movement speed update
+    // m_player->cTransform->pos.x += m_player->cTransform->velocity.x;
+    // m_player->cTransform->pos.y += m_player->cTransform->velocity.y;
+
+    // set the position of the shape based on the entity's transform->pos
+    m_player->cShape->circle.setPosition({m_player->cTransform->pos.x, m_player->cTransform->pos.y});
+
+    // set the rotation of the shape based on the entity's transform->angle
+    m_player->cTransform->angle += 3.0f;
+    m_player->cShape->circle.setRotation(sf::degrees(m_player->cTransform->angle));
+
+    // Move all enemies
+    auto enemyEntities = m_entities.getEntities("enemy");
+    for (auto e: enemyEntities)
     {
-        // if entity has transform component...
+        e->cTransform->pos.x += e->cTransform->velocity.x;
+        e->cTransform->pos.y += e->cTransform->velocity.y;
+
+        e->cShape->circle.setPosition({e->cTransform->pos.x, e->cTransform->pos.y});
+
+        // set the rotation of the shape based on the entity's transform->angle
+        e->cTransform->angle += 1.0f;
+        e->cShape->circle.setRotation(sf::degrees(e->cTransform->angle));
     }
 
-    // Sample movement speed update
-    m_player->cTransform->pos.x += m_player->cTransform->velocity.x;
-    m_player->cTransform->pos.y += m_player->cTransform->velocity.y;
+    // Move small enemies
+    for (auto e : m_entities.getEntities("smallEnemy")) {
+        e->cTransform->pos.x += e->cTransform->velocity.x;
+        e->cTransform->pos.y += e->cTransform->velocity.y;
+
+        e->cShape->circle.setPosition({e->cTransform->pos.x, e->cTransform->pos.y});
+
+        // set the rotation of the shape based on the entity's transform->angle
+        e->cTransform->angle += 1.0f;
+        e->cShape->circle.setRotation(sf::degrees(e->cTransform->angle));
+    }
+
+    // bullet movement
+    for (auto e : m_entities.getEntities("bullet")) {
+        // std::cerr << "Bullet pos: " << e->cTransform->pos.x << ' ' << e->cTransform->pos.y << '\n';
+        e->cTransform->pos.x += e->cTransform->velocity.x;
+        e->cTransform->pos.y += e->cTransform->velocity.y;
+
+        e->cShape->circle.setPosition({e->cTransform->pos.x, e->cTransform->pos.y});
+    }
 }
 
 void Game::sLifespan() {
@@ -135,22 +270,73 @@ void Game::sLifespan() {
     // - if entity has > 0 remaining lifespan, subtract 1
     // - if it has lifespan and is alive scale its alpha channel properly
     // - if it has lifespan and its time is up destroy the entity
+
+
+    // only small enemies and bullets will have lifespan
 }
 
 void Game::sCollision() {
     // TODO: implement all proper collisions between entities
     // be sure to use the collision radius, not the shape radius
     // sample
-//    for (auto bullet: m_entities.getEntities("bullet")) {
-//        for (auto m_entities: m_entities.getEntities()) {
-//            //check collision
-//        }
-//        // we need another loop for small entities because small entities don't spawn further
-//    }
+
+    // collision check between bullet and enemy
+    for (auto bullet: m_entities.getEntities("bullet")) {
+        for (auto entities: m_entities.getEntities("enemy")) {
+            if (bullet->isActive() && entities->isActive() && entities->tag() != "bullet") {
+                // dist. between the centers of the 2 circles
+                float centerDist = bullet->cTransform->pos.distSquare(entities->cTransform->pos);
+                // std::cerr << "Center dist: " << centerDist << '\n';
+                float radiusSum = m_bulletConfig.CR + entities->cCollision->radius;
+                if (centerDist < (radiusSum * radiusSum)) {
+                    // destroy enemy and spawn small enemies
+                    std::cerr << "Bullet " << bullet->id() << " collided with Enemy " << entities->id() << '\n';
+                    bullet->destroy();
+                    entities->destroy();
+                    spawnSmallEnemies(entities);
+                }
+            }
+        }
+
+        // we need another loop for small entities because small entities don't spawn further
+        for (auto entities: m_entities.getEntities("smallEnemy")) {
+            if (bullet->isActive() && entities->isActive() && entities->tag() != "bullet") {
+                // dist. between the centers of the 2 circles
+                float centerDist = bullet->cTransform->pos.distSquare(entities->cTransform->pos);
+                // std::cerr << "Center dist: " << centerDist << '\n';
+                float radiusSum = m_bulletConfig.CR + entities->cCollision->radius;
+                if (centerDist < (radiusSum * radiusSum)) {
+                    // destroy enemy and spawn small enemies
+                    std::cerr << "Bullet " << bullet->id() << " collided with Small enemy " << entities->id() << '\n';
+                    bullet->destroy();
+                    entities->destroy();
+                }
+            }
+        }
+    }
+
+    sf::Vector2u size = m_window.getSize();
+    auto [wWidth, wHeight] = size;
+
+    // enemies colliding with walls
+    auto enemyEntities = m_entities.getEntities("enemy");
+    for (auto e: enemyEntities)
+    {
+        if (e->cTransform->pos.x - e->cCollision->radius < 0 || e->cTransform->pos.x + e->cCollision->radius > (float)wWidth) {
+            e->cTransform->velocity.x *= -1;
+        }
+        if (e->cTransform->pos.y - e->cCollision->radius < 0 || e->cTransform->pos.y + e->cCollision->radius > (float)wHeight) {
+            e->cTransform->velocity.y *= -1;
+        }
+    }
 }
 
 void Game::sEnemySpawner() {
     // TODO: code which implements enemy spawning should go here
+    
+    if (m_currentFrame - m_lastEnemySpawnTime > m_enemyConfig.SI) {
+        spawnEnemy();
+    }
 }
 
 void Game::sGUI() {
@@ -166,19 +352,48 @@ void Game::sRender() {
     // sample drawing of the player Entity that we have created
     m_window.clear();
 
-    // set the position of the shape based on the entity's transform->pos
-    m_player->cShape->circle.setPosition({m_player->cTransform->pos.x, m_player->cTransform->pos.y});
-
-    // set the rotation of the shape based on the entity's transform->angle
-    m_player->cTransform->angle += 1.0f;
-    m_player->cShape->circle.setRotation(sf::degrees(m_player->cTransform->angle));
-
     // draw the entity's sf::CircleShape
     m_window.draw(m_player->cShape->circle);
+    // std::cerr << "Player id: " << m_player->id() << '\n';
+    
+    // draw all active enemies
+    auto enemyEntities = m_entities.getEntities("enemy");
+    for (auto e : enemyEntities) {
+        // std::cerr << "enemy id: " << e->id() << ", tag: " << e->tag() << '\n';
+        if (e->isActive()) {
+            m_window.draw(e->cShape->circle);
+        }
+    }
+
+    // draw all active small enemies
+    for (auto e : m_entities.getEntities("smallEnemy")) {
+        if (e->isActive()) {
+            m_window.draw(e->cShape->circle);
+        }
+    }
+
+    // draw all active bullets
+    auto bulletEntities = m_entities.getEntities("bullet");
+    for (auto e : bulletEntities) {
+        if (e->isActive()) {
+            m_window.draw(e->cShape->circle);
+        }
+    }
+
+    // render text
+    sf::Text m_text(m_font);
+    // set the string to display
+    m_text.setString("Hello world");
+
+    // set the character size
+    m_text.setCharacterSize(m_textSize); // in pixels, not points!
+
+    // set the color
+    m_text.setFillColor(sf::Color(m_textR, m_textG, m_textB));
+    m_window.draw(m_text);
 
     // draw the ui last
     ImGui::SFML::Render(m_window);
-
     m_window.display();
 }
 
@@ -192,7 +407,9 @@ void Game::sUserInput() {
     {
         if (event->is<sf::Event::Closed>())
         {
+            std::cerr << "Window Closed\n";
             m_window.close();
+            m_running = false;
         }
 
         // this event is triggered when a key is pressed
@@ -202,7 +419,16 @@ void Game::sUserInput() {
             {
                 case sf::Keyboard::Key::W:
                     break;
-
+                case sf::Keyboard::Key::E:
+                    spawnEnemy();
+                    break;
+                case sf::Keyboard::Key::Escape:
+                    std::cerr << "Window Closed\n";
+                    m_window.close();
+                    m_running = false;
+                    break;
+                case sf::Keyboard::Key::P:
+                    break;
                 default:
                     break;
             }
@@ -230,15 +456,16 @@ void Game::sUserInput() {
 
             if (mousePressed->button == sf::Mouse::Button::Left)
             {
-                std::cout << "Left Mouse Button Clicked at(" << mousePressed->position.x
-                          << ", " << mousePressed->position.y << ")\n";
-                // TODO: call spawnBullet here
+                std::cout << "Left Mouse Button Clicked at(" << mousePressed->position.x << ", " << mousePressed->position.y << ")\n";
+                sf::Vector2 sfMousePos = sf::Mouse::getPosition(m_window);
+                Vec2 mousePos = Vec2(sfMousePos.x, sfMousePos.y);
+    
+                spawnBullet(m_player, mousePos);
             }
 
             if (mousePressed->button == sf::Mouse::Button::Right)
             {
-                std::cout << "Right Mouse Button Clicked at(" << mousePressed->position.x
-                          << ", " << mousePressed->position.y << ")\n";
+                std::cout << "Right Mouse Button Clicked at(" << mousePressed->position.x << ", " << mousePressed->position.y << ")\n";
                 // TODO: call special weapon here
             }
         }

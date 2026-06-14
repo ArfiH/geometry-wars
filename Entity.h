@@ -3,6 +3,7 @@
 
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "Components.h"
 
@@ -11,11 +12,9 @@ class Entity {
     friend class EntityManager;
 
     bool m_active = true;
-    const size_t m_id = 0;
-    const std::string m_tag = "default";
-
+    size_t m_id = 0;
+    std::string m_tag = "default";
     Entity(size_t id, std::string tag);
-
 public:
     // component pointers
     std::shared_ptr<CTransform> cTransform;
@@ -32,6 +31,8 @@ public:
     [[nodiscard]] size_t id() const;
 
     void destroy();
+
+    std::shared_ptr<Entity> back(const std::vector<std::shared_ptr<Entity>>& EntityVecInput) const;
 };
 
 #endif //ENTITY_H

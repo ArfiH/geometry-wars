@@ -47,12 +47,13 @@ std::shared_ptr<Entity> EntityManager::addEntity(const std::string &tag) {
     // store it in the map of tag->entityVector
     // return the shared pointer pointing to that entity
     // auto e = std::make_shared<Entity>(tag, m_totalEntities++);
-    // m_entities.push_back(e);
+    // m_entitiesToAdd.push_back(e);
     // m_entityMap[tag].push_back(e);
     // return e;
 
     auto entity = std::shared_ptr<Entity>(new Entity(m_totalEntities++, tag));
-    m_entitiesToAdd.push_back(entity);
+    m_entities.push_back(entity);
+    m_entityMap[tag].push_back(entity);
     return entity;
 }
 // note: above code doesn't handle some map-related edge cases

@@ -28,6 +28,10 @@ public:
         circle.setOutlineThickness(thickness);
         circle.setOrigin({radius, radius});
     }
+
+    // float getPointCount() const {
+    //     return circle.getPointCount();
+    // }
 };
 
 

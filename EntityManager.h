@@ -34,6 +34,11 @@ public:
     EntityVec &getEntities(const std::string &tag);
 
     const std::map<std::string, EntityVec> &getEntityMap();
+
+    std::shared_ptr<Entity> back(const std::vector<std::shared_ptr<Entity>> &EntityVecInput) const {
+        return EntityVecInput.back();
+    }
+
 };
 
 #endif //ENTITY_MANAGER_H

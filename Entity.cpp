@@ -1,6 +1,7 @@
 #include "Entity.h"
 
 #include <utility>
+#include <iostream>
 
 Entity::Entity(const size_t i, std::string t)
         : m_id(i), m_tag(std::move(t)) {
@@ -21,3 +22,7 @@ size_t Entity::id() const {
 void Entity::destroy() {
     m_active = false;
 }
+
+// void Entity::print() const {
+//     std::cout << "Entity id: " << this->id << ", tag: " << this->tag << '\n'; 
+// }

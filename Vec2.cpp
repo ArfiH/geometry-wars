@@ -1,5 +1,6 @@
 #include "Vec2.h"
 #include <cmath>
+#include <iostream>
 
 
 Vec2::Vec2() = default;
@@ -30,24 +31,32 @@ Vec2 Vec2::operator/(const float val) const {
     return {x / val, y / val};
 }
 
-Vec2 Vec2::operator+=(const Vec2 &rhs) const {
-    // TODO
-    return {0.0f, 0.0f};
+Vec2& Vec2::operator+=(const Vec2 &rhs) {
+    x += rhs.x;
+    y += rhs.y;
+    return *this;
 }
 
-Vec2 Vec2::operator-=(const Vec2 &rhs) const {
-    // TODO
-    return {0.0f, 0.0f};
+Vec2& Vec2::operator-=(const Vec2 &rhs) {
+    x -= rhs.x;
+    y -= rhs.y;
+    return *this;
 }
 
-Vec2 Vec2::operator/=(const float val) const {
-    // TODO
-    return {0.0f, 0.0f};
+Vec2& Vec2::operator/=(const float val) {
+    if (val == 0) {
+        std::cerr << "Cannot divide by zero.\n";
+        return *this;
+    }
+    x /= val;
+    y /= val;
+    return *this;
 }
 
-Vec2 Vec2::operator*=(const float val) const {
-    // TODO
-    return {0.0f, 0.0f};
+Vec2& Vec2::operator*=(const float val) {
+    x *= val;
+    y *= val;
+    return *this;
 }
 
 float Vec2::dist(const Vec2 &rhs) const {
@@ -57,8 +66,26 @@ float Vec2::dist(const Vec2 &rhs) const {
     return (rhs - *this).length();
 }
 
+float Vec2::distSquare(const Vec2 &rhs) const {
+    // float dx = rhs.x - x;
+    // float dy = rhs.y - y;
+    // return std::sqrt(dx * dx + dy * dy);
+    return (rhs - *this).lengthSqaure();
+}
+
 float Vec2::length() const {
     return std::sqrt(x * x + y * y);
+}
+
+float Vec2::lengthSqaure() const {
+    return (x * x + y * y);
+}
+
+Vec2& Vec2::operator>>=(const Vec2 &rhs) {
+    float mag = this->dist(rhs);
+    x /= mag;
+    y /= mag;
+    return *this;
 }
 
 

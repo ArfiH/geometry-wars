@@ -27,11 +27,14 @@ class Game {
     sf::RenderWindow m_window;              // the window we will draw to
     EntityManager m_entities;               // vector of entities to maintain
     sf::Font m_font;                        // the font we will use to draw
-    std::optional<sf::Text> m_text;                        // the score text to be drawn to the screen
     PlayerConfig m_playerConfig;
     EnemyConfig m_enemyConfig;
     BulletConfig m_bulletConfig;
     sf::Clock m_deltaClock;
+    int m_textSize = 20;
+    int m_textR = 0;
+    int m_textG = 0;
+    int m_textB = 255;    
     int m_score = 0;
     int m_currentFrame = 0;
     std::shared_ptr<Entity> m_player;
