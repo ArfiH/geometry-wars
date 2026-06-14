@@ -10,10 +10,6 @@ Game::Game(const std::string &config) {
 }
 
 void Game::init(const std::string &path) {
-    // TODO: read in config file here
-    //       use the pre made PlayerConfig, EnemyConfig, BulletConfig variables
-    const int FRAME_LIMT = 60;
-    
     const std::string filePath = "../" + path;     
     std::ifstream file(filePath);
     if (!file.is_open()) {
@@ -61,7 +57,7 @@ void Game::init(const std::string &path) {
     m_window.create(sf::VideoMode({wWidth, wHeight}), "Assignment 2", isFullscreen);
 
     // sf::RenderWindow m_window(sf::VideoMode({1280, 720}), "Assignment 2");
-    m_window.setFramerateLimit(FRAME_LIMT); // limit frame rate to 60 fps
+    m_window.setFramerateLimit(frameLimit); // limit frame rate to 60 fps
 
     // initialize IMGUI and create a clock used for its internal timing
     if (!ImGui::SFML::Init(m_window))
@@ -75,7 +71,7 @@ void Game::init(const std::string &path) {
     ImGui::GetIO().FontGlobalScale = 2.0f;
 
     spawnPlayer();
-    spawnEnemy();
+    // spawnEnemy();
 }
 
 void Game::run() {
@@ -90,8 +86,8 @@ void Game::run() {
     while (m_running)
     {
         // update the entity manager
+        m_entitiesToAdd.update();
         m_entities.update();
-        // m_entitiesToAdd.update();
 
         // required update call to imgui
         ImGui::SFML::Update(m_window, m_deltaClock.restart());
@@ -148,12 +144,11 @@ void Game::spawnEnemy() {
 
     auto e = m_entities.addEntity("enemy");
 
-    const int SCREEN_OFFSET = 47;
+    const int SCREEN_OFFSET = 100;
     const int MAX_POINT_COUNT = 8;
     int randomX = (std::rand() % (1280 - SCREEN_OFFSET)) + SCREEN_OFFSET; 
     int randomY = (std::rand() % (720 - SCREEN_OFFSET)) + SCREEN_OFFSET; 
     int randPointCount = (std::rand() % m_enemyConfig.VMAX) + m_enemyConfig.VMIN;
-    // std::cerr << "Random: " << randomX << ' ' << randomY << '\n';
     float minSpeed = m_enemyConfig.SMIN;
     float maxSpeed = m_enemyConfig.SMAX;
     float randSpeed = (std::rand() % (int)minSpeed) + maxSpeed;
@@ -222,8 +217,23 @@ void Game::sMovement() {
     // sample:
 
     // Sample player movement speed update
+    if (m_player->cInput->up) {
+        m_player->cTransform->pos.y -= m_player->cTransform->velocity.y;
+        m_player->cInput->up = false;
+    }
+    if (m_player->cInput->down) {
+        m_player->cTransform->pos.y += m_player->cTransform->velocity.y;
+        m_player->cInput->down = false;
+    }
+    if (m_player->cInput->left) {
+        m_player->cTransform->pos.x -= m_player->cTransform->velocity.x;
+        m_player->cInput->left = false;
+    }
+    if (m_player->cInput->right) {
+        m_player->cTransform->pos.x += m_player->cTransform->velocity.x;
+        m_player->cInput->right = false;
+    }
     // m_player->cTransform->pos.x += m_player->cTransform->velocity.x;
-    // m_player->cTransform->pos.y += m_player->cTransform->velocity.y;
 
     // set the position of the shape based on the entity's transform->pos
     m_player->cShape->circle.setPosition({m_player->cTransform->pos.x, m_player->cTransform->pos.y});
@@ -427,6 +437,20 @@ void Game::sUserInput() {
             switch (keyPressed->code)
             {
                 case sf::Keyboard::Key::W:
+                    m_player->cInput->up = true;
+
+                    break;
+                case sf::Keyboard::Key::A:
+                    m_player->cInput->left = true;
+
+                    break;
+                case sf::Keyboard::Key::S:
+                    m_player->cInput->down = true;
+
+                    break;
+                case sf::Keyboard::Key::D:
+                    m_player->cInput->right = true;
+
                     break;
                 case sf::Keyboard::Key::E:
                     spawnEnemy();

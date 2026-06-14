@@ -63,7 +63,7 @@ class Game {
 public:
     Game(const std::string &config);
 
-    // void update();
+    void update();
     void run();
 
     void setPaused(bool paused);

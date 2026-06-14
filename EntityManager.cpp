@@ -10,13 +10,17 @@ void EntityManager::update() {
     // - add entities from m_entitiesToAdd to the proper location(s)
     // - add them to the vector of all entities
     // - add them to the vector inside the map, with the tag as a key
-   // for (auto e: m_entitiesToAdd) {
-   //     m_entities.push_back(e);
-   //     std::string tagStr = e->tag();
-   //     std::cerr << "Added " << tagStr << '\n'; 
-   //     m_entityMap[tagStr].push_back(e);
-   // }
-   // m_entitiesToAdd.clear();
+   
+    if (m_entitiesToAdd.size()) {
+        std::cerr << "m_entitiesToAdd's size: " << m_entitiesToAdd.size() << '\n'; 
+    }
+    for (auto e: m_entitiesToAdd) {
+        m_entities.push_back(e);
+        std::string tagStr = e->tag();
+        std::cerr << "Added " << tagStr << '\n'; 
+        m_entityMap[tagStr].push_back(e);
+    }
+    m_entitiesToAdd.clear();
    
     // remove dead entities from the vector of all entities
     removeDeadEntities(m_entities);
@@ -59,15 +63,15 @@ std::shared_ptr<Entity> EntityManager::addEntity(const std::string &tag) {
     // store it in the vector of all entities
     // store it in the map of tag->entityVector
     // return the shared pointer pointing to that entity
-    // auto e = std::make_shared<Entity>(tag, m_totalEntities++);
-    // m_entitiesToAdd.push_back(e);
-    // m_entityMap[tag].push_back(e);
-    // return e;
+    auto e = std::shared_ptr<Entity>(new Entity(m_totalEntities++, tag));
+    m_entitiesToAdd.push_back(e);
+    m_entityMap[tag].push_back(e);
+    return e;
 
-    auto entity = std::shared_ptr<Entity>(new Entity(m_totalEntities++, tag));
-    m_entities.push_back(entity);
-    m_entityMap[tag].push_back(entity);
-    return entity;
+    // auto entity = std::shared_ptr<Entity>(new Entity(m_totalEntities++, tag));
+    // m_entities.push_back(entity);
+    // m_entityMap[tag].push_back(entity);
+    // return entity;
 }
 // note: above code doesn't handle some map-related edge cases
 
