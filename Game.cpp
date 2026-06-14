@@ -91,6 +91,7 @@ void Game::run() {
     {
         // update the entity manager
         m_entities.update();
+        // m_entitiesToAdd.update();
 
         // required update call to imgui
         ImGui::SFML::Update(m_window, m_deltaClock.restart());
@@ -100,6 +101,7 @@ void Game::run() {
         sCollision();
         sUserInput();
         sGUI();
+        sLifespan();
         sRender();
 
         // increment the current frame
@@ -115,20 +117,21 @@ void Game::setPaused(bool paused) {
 
 // respawn the player in the middle of the screen
 void Game::spawnPlayer() {
-    // TODO: Finish adding all properties of the player with the correct values from config
+    sf::Vector2u size = m_window.getSize();
+    auto [wWidth, wHeight] = size;
 
     // We create every entity by calling EntityManager.addEntity(tag)
     // This returns a std::shared_ptr<Entity>, so we use 'auto' to save typing
     auto entity = m_entities.addEntity("player");
 
     // Give this entity a Transform, so it spawns at (200,200) with velocity (1,1) and angle 0
-    entity->cTransform = std::make_shared<CTransform>(Vec2(200.0f, 200.0f), Vec2(1.0f, 1.0f), 0.0f);
+    entity->cTransform = std::make_shared<CTransform>(Vec2(wWidth / 2.f, wHeight / 2.f), Vec2(m_playerConfig.S, m_playerConfig.S), 0.0f);
 
     // The entity's shape will have radius 32, 8 sides, dark grey fill, and red outline of thickness 4
     // entity->cShape = std::make_shared<CShape>(32.0f, 8, sf::Color(10, 10, 10), sf::Color(255, 0, 0), 4.0f);
 
     entity->cShape = std::make_shared<CShape>(m_playerConfig.SR, m_playerConfig.V, sf::Color(m_playerConfig.FR, m_playerConfig.FG, m_playerConfig.FB), sf::Color(m_playerConfig.OR, m_playerConfig.OG, m_playerConfig.OB), m_playerConfig.OT);
-    
+    entity->cCollision = std::make_shared<CCollision>(m_playerConfig.CR);
     // Add an input component to the player so that we can use inputs
     entity->cInput = std::make_shared<CInput>();
 
@@ -183,6 +186,7 @@ void Game::spawnSmallEnemies(std::shared_ptr<Entity> e) {
         smallE->cTransform = std::make_shared<CTransform>(e->cTransform->pos, Vec2(3.f * direction[i % 4].first, 3.f * direction[i % 4].second), 0.0f);
         smallE->cShape = std::make_shared<CShape>(m_enemyConfig.SR / 2.f, n, e->cShape->circle.getFillColor(), e->cShape->circle.getOutlineColor(), m_enemyConfig.OT);
         smallE->cCollision = std::make_shared<CCollision>(m_enemyConfig.CR);
+        smallE->cLifespan = std::make_shared<CLifespan>(m_enemyConfig.L);
     }
 }
 
@@ -196,6 +200,8 @@ void Game::spawnBullet(std::shared_ptr<Entity> entity, const Vec2 &target) {
     bullet->cTransform = std::make_shared<CTransform>(m_player->cTransform->pos, Vec2(3, 3), 0.f);
     bullet->cShape = std::make_shared<CShape>(m_bulletConfig.SR, m_bulletConfig.V, sf::Color(m_bulletConfig.FR, m_bulletConfig.FG, m_bulletConfig.FB), sf::Color(m_bulletConfig.OR, m_bulletConfig.OG, m_bulletConfig.OB), 0.0f); 
     bullet->cCollision = std::make_shared<CCollision>(m_bulletConfig.CR);
+    bullet->cLifespan = std::make_shared<CLifespan>(m_bulletConfig.L);
+
     // originate the bullet from the center of entity and move towards target
     Vec2 normalizedVelocity = target;
     normalizedVelocity -= bullet->cTransform->pos;
@@ -272,7 +278,25 @@ void Game::sLifespan() {
     // - if it has lifespan and its time is up destroy the entity
 
 
-    // only small enemies and bullets will have lifespan
+    for (auto e : m_entities.getEntities()) {
+        if (!(e->tag() == "bullet" || e->tag() == "smallEnemy")) {
+            continue;
+        }
+        e->cLifespan->remaining -= 1;
+        if (e->cLifespan->remaining <= 0) {
+            e->destroy();
+        }
+        else {
+            sf::Color fill_color = e->cShape->circle.getFillColor();
+            sf::Color outline_color = e->cShape->circle.getOutlineColor();
+            fill_color.a = (1.f * e->cLifespan->remaining / e->cLifespan->total) * 255.f;
+            outline_color.a = (1.f * e->cLifespan->remaining / e->cLifespan->total) * 255.f;
+
+            // int alpha = (e->cLifespan->remaining / e->cLifespan->total) * 255.f;
+            e->cShape->circle.setFillColor(fill_color);
+            e->cShape->circle.setOutlineColor(outline_color);
+        }
+    }
 }
 
 void Game::sCollision() {
@@ -319,9 +343,12 @@ void Game::sCollision() {
     auto [wWidth, wHeight] = size;
 
     // enemies colliding with walls
-    auto enemyEntities = m_entities.getEntities("enemy");
+    auto enemyEntities = m_entities.getEntities();
     for (auto e: enemyEntities)
-    {
+    {   
+        if (!(e->tag() == "enemy" || e->tag() == "smallEnemy" || e->tag() == "player")) {
+            continue;
+        }
         if (e->cTransform->pos.x - e->cCollision->radius < 0 || e->cTransform->pos.x + e->cCollision->radius > (float)wWidth) {
             e->cTransform->velocity.x *= -1;
         }
@@ -333,7 +360,6 @@ void Game::sCollision() {
 
 void Game::sEnemySpawner() {
     // TODO: code which implements enemy spawning should go here
-    
     if (m_currentFrame - m_lastEnemySpawnTime > m_enemyConfig.SI) {
         spawnEnemy();
     }
@@ -356,30 +382,13 @@ void Game::sRender() {
     m_window.draw(m_player->cShape->circle);
     // std::cerr << "Player id: " << m_player->id() << '\n';
     
-    // draw all active enemies
-    auto enemyEntities = m_entities.getEntities("enemy");
-    for (auto e : enemyEntities) {
-        // std::cerr << "enemy id: " << e->id() << ", tag: " << e->tag() << '\n';
-        if (e->isActive()) {
-            m_window.draw(e->cShape->circle);
+    // draw all active entities
+    for (auto e : m_entities.getEntities()) {
+        if (e->isActive() == false) {
+            continue;
         }
+        m_window.draw(e->cShape->circle);
     }
-
-    // draw all active small enemies
-    for (auto e : m_entities.getEntities("smallEnemy")) {
-        if (e->isActive()) {
-            m_window.draw(e->cShape->circle);
-        }
-    }
-
-    // draw all active bullets
-    auto bulletEntities = m_entities.getEntities("bullet");
-    for (auto e : bulletEntities) {
-        if (e->isActive()) {
-            m_window.draw(e->cShape->circle);
-        }
-    }
-
     // render text
     sf::Text m_text(m_font);
     // set the string to display

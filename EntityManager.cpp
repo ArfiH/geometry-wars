@@ -1,4 +1,5 @@
 #include "EntityManager.h"
+#include <iostream>
 
 EntityManager::EntityManager() = default;
 
@@ -9,36 +10,48 @@ void EntityManager::update() {
     // - add entities from m_entitiesToAdd to the proper location(s)
     // - add them to the vector of all entities
     // - add them to the vector inside the map, with the tag as a key
-//    for (auto e: m_entitiesToAdd) {
-//        m_entities.push_back(e);
-//        m_entityMap[e->tag].push_back(e);
-//    }
-
+   // for (auto e: m_entitiesToAdd) {
+   //     m_entities.push_back(e);
+   //     std::string tagStr = e->tag();
+   //     std::cerr << "Added " << tagStr << '\n'; 
+   //     m_entityMap[tagStr].push_back(e);
+   // }
+   // m_entitiesToAdd.clear();
+   
     // remove dead entities from the vector of all entities
     removeDeadEntities(m_entities);
-
     // remove dead entities from each vector in the entity map
     // C++20 way ot iterating through [key, value] pairs in a map
-//    for (auto &[tag, entityVec]: m_entityMap) {
-//        removeDeadEntities(entityVec);
-//    }
-
-    m_entitiesToAdd.clear();
+    for (auto &[tag, entityVec]: m_entityMap) {
+        removeDeadEntities(entityVec);
+    }
 }
 
 void EntityManager::removeDeadEntities(EntityVec &vec) {
     // TODO: remove all dead entities from the input vector
     // this is called by the update() function
 
-    // for (auto e: m_entities)
-    // {
-    //     // if e is dead, remove it from m_entities
-    //     // if e is dead, remove it from m_entityMap[e->tag()]
-    //     if (! e->m_alive)
-    //     {
-    //         // ...
-    //     }
-    // }
+    int removeCnt = 0;
+    size_t i = 0;
+    for (auto e: m_entities)
+    {
+        // if e is dead, remove it from m_entities
+        // if e is dead, remove it from m_entityMap[e->tag()]
+        if (!e->isActive())
+        {
+            // remove the item and put the last item of that vector in its place
+            m_entities[i] = m_entities.back();
+            removeCnt++;
+            std::cerr << "Deleted " << e->tag() << ' ' << e->id() << " from m_entities\n";
+        }
+        i++;
+    }
+
+    // pop_back() removeCnt times
+    while (m_entities.size() > 0 && removeCnt) {
+        m_entities.pop_back();
+        removeCnt--;
+    }
 }
 
 std::shared_ptr<Entity> EntityManager::addEntity(const std::string &tag) {
