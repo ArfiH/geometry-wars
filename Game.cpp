@@ -4,6 +4,7 @@
 #include <cstdlib> // For rand() and srand()
 #include <ctime>   // For time()
 #include <fstream>
+#include <cmath>
 
 Game::Game(const std::string &config) {
     init(config);
@@ -216,25 +217,24 @@ void Game::sMovement() {
     // you should read the m_player->cInput component to determine if the player is moving
     // sample:
 
-    // Sample player movement speed update
+    // player movement speed update
     if (m_player->cInput->up) {
-        m_player->cTransform->pos.y -= m_player->cTransform->velocity.y;
+        m_player->cTransform->pos.y -= std::abs(m_player->cTransform->velocity.y);
         m_player->cInput->up = false;
     }
     if (m_player->cInput->down) {
-        m_player->cTransform->pos.y += m_player->cTransform->velocity.y;
+        m_player->cTransform->pos.y += std::abs(m_player->cTransform->velocity.y);
         m_player->cInput->down = false;
     }
     if (m_player->cInput->left) {
-        m_player->cTransform->pos.x -= m_player->cTransform->velocity.x;
+        m_player->cTransform->pos.x -= std::abs(m_player->cTransform->velocity.x);
         m_player->cInput->left = false;
     }
     if (m_player->cInput->right) {
-        m_player->cTransform->pos.x += m_player->cTransform->velocity.x;
+        m_player->cTransform->pos.x += std::abs(m_player->cTransform->velocity.x);
         m_player->cInput->right = false;
     }
-    // m_player->cTransform->pos.x += m_player->cTransform->velocity.x;
-
+    
     // set the position of the shape based on the entity's transform->pos
     m_player->cShape->circle.setPosition({m_player->cTransform->pos.x, m_player->cTransform->pos.y});
 
@@ -353,10 +353,28 @@ void Game::sCollision() {
     auto [wWidth, wHeight] = size;
 
     // enemies colliding with walls
-    auto enemyEntities = m_entities.getEntities();
-    for (auto e: enemyEntities)
+    auto allEntities = m_entities.getEntities();
+    for (auto e: allEntities)
     {   
+        // if e->hasCollison then proceed otherwise continue to next entity
         if (!(e->tag() == "enemy" || e->tag() == "smallEnemy" || e->tag() == "player")) {
+            continue;
+        }
+
+        // if you want to allow player to teleport to the other side of map when touching wall, just toggle std::max and std::min
+        if (e->tag() == "player") {
+            if (e->cTransform->pos.x - e->cCollision->radius < 0) {
+                e->cTransform->pos.x += std::max(0.f, e->cTransform->velocity.x);
+            }    
+            if (e->cTransform->pos.x + e->cCollision->radius > (float)wWidth) {
+                e->cTransform->pos.x -= std::min((float)wWidth - e->cCollision->radius, e->cTransform->velocity.x);
+            }
+            if (e->cTransform->pos.y - e->cCollision->radius < 0) {
+                e->cTransform->pos.y += std::max(0.f, e->cTransform->velocity.y);
+            }        
+            if (e->cTransform->pos.y + e->cCollision->radius > (float)wHeight) {
+                e->cTransform->pos.y -= std::min((float)wHeight - e->cCollision->radius, e->cTransform->velocity.y);
+            }
             continue;
         }
         if (e->cTransform->pos.x - e->cCollision->radius < 0 || e->cTransform->pos.x + e->cCollision->radius > (float)wWidth) {
@@ -422,6 +440,7 @@ void Game::sUserInput() {
     // you shold not implement the player's movement logic here
     // the movement system will read the variables you set in this functioin
 
+    // EVENT POLLING (One-time actions & state changes)
     while (const std::optional event = m_window.pollEvent())
     {
         if (event->is<sf::Event::Closed>())
@@ -431,48 +450,22 @@ void Game::sUserInput() {
             m_running = false;
         }
 
-        // this event is triggered when a key is pressed
+        // Key Press Events
         if (const auto* keyPressed = event->getIf<sf::Event::KeyPressed>())
         {
             switch (keyPressed->code)
             {
-                case sf::Keyboard::Key::W:
-                    m_player->cInput->up = true;
-
-                    break;
-                case sf::Keyboard::Key::A:
-                    m_player->cInput->left = true;
-
-                    break;
-                case sf::Keyboard::Key::S:
-                    m_player->cInput->down = true;
-
-                    break;
-                case sf::Keyboard::Key::D:
-                    m_player->cInput->right = true;
-
-                    break;
                 case sf::Keyboard::Key::E:
                     spawnEnemy();
                     break;
+
                 case sf::Keyboard::Key::Escape:
-                    std::cerr << "Window Closed\n";
                     m_window.close();
                     m_running = false;
                     break;
+
                 case sf::Keyboard::Key::P:
-                    break;
-                default:
-                    break;
-            }
-        }
-
-        // this event is triggered when a key is released
-        if (const auto* keyReleased = event->getIf<sf::Event::KeyReleased>())
-        {
-            switch (keyReleased->code)
-            {
-                case sf::Keyboard::Key::W:
+                    // pause game
                     break;
 
                 default:
@@ -480,30 +473,27 @@ void Game::sUserInput() {
             }
         }
 
-        if (const auto* mousePressed =
-                event->getIf<sf::Event::MouseButtonPressed>())
+        // Mouse Events
+        if (const auto* mousePressed = event->getIf<sf::Event::MouseButtonPressed>())
         {
-            // this line ignores mouse events if ImGui is the thing being clicked
-            if (ImGui::GetIO().WantCaptureMouse)
-            { continue; }
+            if (ImGui::GetIO().WantCaptureMouse) { continue; }
 
             if (mousePressed->button == sf::Mouse::Button::Left)
             {
-                std::cout << "Left Mouse Button Clicked at(" << mousePressed->position.x << ", " << mousePressed->position.y << ")\n";
                 sf::Vector2 sfMousePos = sf::Mouse::getPosition(m_window);
                 Vec2 mousePos = Vec2(sfMousePos.x, sfMousePos.y);
-    
                 spawnBullet(m_player, mousePos);
-            }
-
-            if (mousePressed->button == sf::Mouse::Button::Right)
-            {
-                std::cout << "Right Mouse Button Clicked at(" << mousePressed->position.x << ", " << mousePressed->position.y << ")\n";
-                // TODO: call special weapon here
             }
         }
     }
+
+    // Reset flags every frame so movement stops when keys are released
+    m_player->cInput->up    = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::W);
+    m_player->cInput->down  = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::S);
+    m_player->cInput->left  = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::A);
+    m_player->cInput->right = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::D);
 }
+
 
 // void collisions()
 // {
