@@ -91,13 +91,15 @@ void Game::run() {
         m_entities.update();
 
         // required update call to imgui
-        ImGui::SFML::Update(m_window, m_deltaClock.restart());
+        // ImGui::SFML::Update(m_window, m_deltaClock.restart());
 
         sEnemySpawner();
-        sMovement();
+        if (m_isMovementActive) {
+            sMovement();
+        }
+        sGUI();
         sCollision();
         sUserInput();
-        sGUI();
         sLifespan();
         sRender();
 
@@ -383,6 +385,7 @@ void Game::sCollision() {
         if (e->cTransform->pos.y - e->cCollision->radius < 0 || e->cTransform->pos.y + e->cCollision->radius > (float)wHeight) {
             e->cTransform->velocity.y *= -1;
         }
+
     }
 }
 
@@ -394,9 +397,46 @@ void Game::sEnemySpawner() {
 }
 
 void Game::sGUI() {
+    ImGui::SFML::Update(m_window, m_deltaClock.restart());
     ImGui::Begin("Geometry Wars");
 
-    ImGui::Text("Stuff Goes Here");
+    // Create a unique identifier for the tab bar system
+    if (ImGui::BeginTabBar("Tab1")) 
+    {
+        // First Tab
+        if (ImGui::BeginTabItem("Systems")) 
+        {
+            // Movement
+
+            // The macro/function takes a label and a pointer to your bool
+            if (ImGui::Checkbox("Movement", &m_isMovementActive)) 
+            {
+                // This block runs ONLY on the exact frame the user clicks the checkbox
+                std::cerr << "Checkbox toggled! New state: " << m_isMovementActive << "\n";
+            }
+
+            // Collision
+            // Spawning
+            // Spawn interval
+            // Manual Spawn
+            
+            ImGui::EndTabItem();
+        }
+
+        // Second Tab
+        if (ImGui::BeginTabItem("Entity Manager")) 
+        {
+            ImGui::Text("Entities");
+            
+            // Entities by Tag
+            // All entities
+
+            ImGui::EndTabItem();
+        }
+
+        // Always match BeginTabBar with EndTabBar
+        ImGui::EndTabBar(); 
+    }
 
     ImGui::End();
 }
@@ -443,6 +483,9 @@ void Game::sUserInput() {
     // EVENT POLLING (One-time actions & state changes)
     while (const std::optional event = m_window.pollEvent())
     {
+        // Allow ImGui to listen to events
+        ImGui::SFML::ProcessEvent(m_window, *event);
+
         if (event->is<sf::Event::Closed>())
         {
             std::cerr << "Window Closed\n";

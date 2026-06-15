@@ -27,7 +27,6 @@ class Game {
     sf::RenderWindow m_window;              // the window we will draw to
     EntityManager m_entities;               // vector of entities to maintain
     EntityManager m_entitiesToAdd;          // vector of new entities to add
-    EntityManager m_entitiesToRemove;       // vector of dead entities to remove
     sf::Font m_font;                        // the font we will use to draw
     PlayerConfig m_playerConfig;
     EnemyConfig m_enemyConfig;
@@ -42,6 +41,9 @@ class Game {
     std::shared_ptr<Entity> m_player;
     bool m_pause = false;
     bool m_running = true;
+    bool m_isMovementActive = true;
+    bool m_isCollisionActive = true;
+    bool m_isSpawningActive = true;
     int m_lastEnemySpawnTime;
 
     void init(const std::string &path);
