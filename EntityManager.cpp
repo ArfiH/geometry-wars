@@ -37,50 +37,23 @@ void EntityManager::removeDeadEntities(EntityVec &vec) {
 
     int removeCnt = 0;
     size_t i = 0;
-    for (auto e: m_entities)
+    for (auto& e: vec)
     {
-        // if e is dead, remove it from m_entities
+        // if e is dead, remove it from vec
         if (!e->isActive())
         {
             // remove the item and put the last item of that vector in its place
-            m_entities[i] = m_entities.back();
+            vec[i] = vec.back();
             removeCnt++;
-            std::cerr << "Deleted " << e->tag() << ' ' << e->id() << " from m_entities\n";
+            std::cerr << "Deleted " << e->tag() << ' ' << e->id() << " from input vec\n";
         }
         i++;
     }
 
     // pop_back() removeCnt times
-    while (m_entities.size() > 0 && removeCnt) {
-        m_entities.pop_back();
+    while (vec.size() > 0 && removeCnt) {
+        vec.pop_back();
         removeCnt--;
-    }
-
-
-    // if e is dead, remove it from m_entityMap[e->tag()]
-    // remove from entityMap as well
-    removeCnt = 0;
-    const char* allTags[] = {"player", "enemy", "smallEnemy", "bullet"};
-    for (size_t k = 0; k < sizeof(allTags) / sizeof(allTags[0]); k++) { 
-        size_t j = 0;
-        for (auto entity : m_entityMap[allTags[k]]) {
-            if (!entity->isActive())
-            {
-                if (m_entityMap[allTags[k]].size() > 0) {
-                    m_entityMap[allTags[k]][j] = m_entityMap[allTags[k]].back();
-                    removeCnt++;
-                    std::cerr << "Deleted " << entity->tag() << ' ' << entity->id() << " from entitiesMap\n";
-                }
-            }
-            j++;
-            
-        }
-
-        // pop_back() removeCnt times
-        while (m_entityMap[allTags[k]].size() > 0 && removeCnt) {
-            m_entityMap[allTags[k]].pop_back();
-            removeCnt--;
-        }
     }
 }
 

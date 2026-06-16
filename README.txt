@@ -89,6 +89,8 @@ Fill Color        FR,FG,FB  int,int,int
 Outline Color     OR,OG,OB  int,int,int
 Outline Thickness OT        int
 Shape vertices    V         int
+Score enemy       SE        int
+Score smallEnemy  SSE       int
 
 Enemy Specification:
 Enemy SR CR SMIN SMAX OR OG OB OT VMIN VMAX L SI

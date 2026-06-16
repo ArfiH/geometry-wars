@@ -42,6 +42,7 @@ void Game::init(const std::string &path) {
             file >> m_playerConfig.SR >> m_playerConfig.CR;
             file >> m_playerConfig.S;
             file >> m_playerConfig.FR >> m_playerConfig.FG >> m_playerConfig.FB >> m_playerConfig.OR >> m_playerConfig.OG >> m_playerConfig.OB >> m_playerConfig.OT >> m_playerConfig.V;
+            file >> m_playerConfig.SE >> m_playerConfig.SSE;
         }
         else if (temp == "Enemy") {
             file >> m_enemyConfig.SR >> m_enemyConfig.CR >> m_enemyConfig.SMIN >> m_enemyConfig.SMAX >> m_enemyConfig.OR >> m_enemyConfig.OG >> m_enemyConfig.OB >> m_enemyConfig.OT >> m_enemyConfig.VMIN >> m_enemyConfig.VMAX >> m_enemyConfig.L >> m_enemyConfig.SI;
@@ -89,6 +90,8 @@ void Game::run() {
         // update the entity manager
         m_entitiesToAdd.update();
         m_entities.update();
+
+
 
         // required update call to imgui
         // ImGui::SFML::Update(m_window, m_deltaClock.restart());
@@ -325,7 +328,7 @@ void Game::sCollision() {
     // collision check between bullet and enemy
     for (auto bullet: m_entities.getEntities("bullet")) {
         for (auto entities: m_entities.getEntities("enemy")) {
-            if (bullet->isActive() && entities->isActive() && entities->tag() != "bullet") {
+            if (bullet->isActive() && entities->isActive()) {
                 // dist. between the centers of the 2 circles
                 float centerDist = bullet->cTransform->pos.distSquare(entities->cTransform->pos);
                 // std::cerr << "Center dist: " << centerDist << '\n';
@@ -335,6 +338,7 @@ void Game::sCollision() {
                     std::cerr << "Bullet " << bullet->id() << " collided with Enemy " << entities->id() << '\n';
                     bullet->destroy();
                     entities->destroy();
+                    m_score += m_playerConfig.SE;
                     spawnSmallEnemies(entities);
                 }
             }
@@ -342,7 +346,7 @@ void Game::sCollision() {
 
         // we need another loop for small entities because small entities don't spawn further
         for (auto entities: m_entities.getEntities("smallEnemy")) {
-            if (bullet->isActive() && entities->isActive() && entities->tag() != "bullet") {
+            if (bullet->isActive() && entities->isActive()) {
                 // dist. between the centers of the 2 circles
                 float centerDist = bullet->cTransform->pos.distSquare(entities->cTransform->pos);
                 // std::cerr << "Center dist: " << centerDist << '\n';
@@ -352,6 +356,7 @@ void Game::sCollision() {
                     std::cerr << "Bullet " << bullet->id() << " collided with Small enemy " << entities->id() << '\n';
                     bullet->destroy();
                     entities->destroy();
+                    m_score += m_playerConfig.SSE;
                 }
             }
         }
@@ -512,8 +517,9 @@ void Game::sRender() {
     }
     // render text
     sf::Text m_text(m_font);
+    std::string scoreStr = std::to_string(m_score);
     // set the string to display
-    m_text.setString("Hello world");
+    m_text.setString("Score: " + scoreStr);
 
     // set the character size
     m_text.setCharacterSize(m_textSize); // in pixels, not points!
