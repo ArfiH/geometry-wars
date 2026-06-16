@@ -91,6 +91,7 @@ Outline Thickness OT        int
 Shape vertices    V         int
 Score enemy       SE        int
 Score smallEnemy  SSE       int
+Score player dead PD        int
 
 Enemy Specification:
 Enemy SR CR SMIN SMAX OR OG OB OT VMIN VMAX L SI

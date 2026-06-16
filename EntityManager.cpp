@@ -43,7 +43,9 @@ void EntityManager::removeDeadEntities(EntityVec &vec) {
         if (!e->isActive())
         {
             // remove the item and put the last item of that vector in its place
-            vec[i] = vec.back();
+            if (vec.size() > 0) {
+                vec[i] = vec.back();
+            }
             removeCnt++;
             std::cerr << "Deleted " << e->tag() << ' ' << e->id() << " from input vec\n";
         }

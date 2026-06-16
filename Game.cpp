@@ -11,6 +11,9 @@ Game::Game(const std::string &config) {
 }
 
 void Game::init(const std::string &path) {
+    // sf::Vector2u size = m_window.getSize();
+    // [m_wWidth, m_wHeight] = size;
+
     const std::string filePath = "../" + path;     
     std::ifstream file(filePath);
     if (!file.is_open()) {
@@ -18,14 +21,14 @@ void Game::init(const std::string &path) {
         return;
     }
     
-    unsigned int wWidth, wHeight, frameLimit;
+    unsigned int frameLimit;
     bool isFullscreen = 0;
 
 
     std::string temp;
     while (file >> temp) {
         if (temp == "Window") {
-            file >> wWidth >> wHeight >> frameLimit;
+            file >> m_wWidth >> m_wHeight >> frameLimit;
             file >> isFullscreen;
         }
         else if (temp == "Font") {
@@ -42,7 +45,7 @@ void Game::init(const std::string &path) {
             file >> m_playerConfig.SR >> m_playerConfig.CR;
             file >> m_playerConfig.S;
             file >> m_playerConfig.FR >> m_playerConfig.FG >> m_playerConfig.FB >> m_playerConfig.OR >> m_playerConfig.OG >> m_playerConfig.OB >> m_playerConfig.OT >> m_playerConfig.V;
-            file >> m_playerConfig.SE >> m_playerConfig.SSE;
+            file >> m_playerConfig.SE >> m_playerConfig.SSE >> m_playerConfig.PD;
         }
         else if (temp == "Enemy") {
             file >> m_enemyConfig.SR >> m_enemyConfig.CR >> m_enemyConfig.SMIN >> m_enemyConfig.SMAX >> m_enemyConfig.OR >> m_enemyConfig.OG >> m_enemyConfig.OB >> m_enemyConfig.OT >> m_enemyConfig.VMIN >> m_enemyConfig.VMAX >> m_enemyConfig.L >> m_enemyConfig.SI;
@@ -56,7 +59,7 @@ void Game::init(const std::string &path) {
     file.close();
 
     // set up default window parameters
-    m_window.create(sf::VideoMode({wWidth, wHeight}), "Assignment 2", isFullscreen);
+    m_window.create(sf::VideoMode({m_wWidth, m_wHeight}), "Assignment 2", isFullscreen);
 
     // sf::RenderWindow m_window(sf::VideoMode({1280, 720}), "Assignment 2");
     m_window.setFramerateLimit(frameLimit); // limit frame rate to 60 fps
@@ -109,7 +112,9 @@ void Game::run() {
             sCollision();
         }
         sUserInput();
-        sLifespan();
+        if (m_isLifespanActive) {
+            sLifespan();
+        }
         sRender();
 
         // increment the current frame
@@ -125,15 +130,12 @@ void Game::setPaused(bool paused) {
 
 // respawn the player in the middle of the screen
 void Game::spawnPlayer() {
-    sf::Vector2u size = m_window.getSize();
-    auto [wWidth, wHeight] = size;
-
     // We create every entity by calling EntityManager.addEntity(tag)
     // This returns a std::shared_ptr<Entity>, so we use 'auto' to save typing
     auto entity = m_entities.addEntity("player");
 
     // Give this entity a Transform, so it spawns at (200,200) with velocity (1,1) and angle 0
-    entity->cTransform = std::make_shared<CTransform>(Vec2(wWidth / 2.f, wHeight / 2.f), Vec2(m_playerConfig.S, m_playerConfig.S), 0.0f);
+    entity->cTransform = std::make_shared<CTransform>(Vec2(m_wWidth / 2.f, m_wHeight / 2.f), Vec2(m_playerConfig.S, m_playerConfig.S), 0.0f);
 
     // The entity's shape will have radius 32, 8 sides, dark grey fill, and red outline of thickness 4
     // entity->cShape = std::make_shared<CShape>(32.0f, 8, sf::Color(10, 10, 10), sf::Color(255, 0, 0), 4.0f);
@@ -188,11 +190,12 @@ void Game::spawnSmallEnemies(std::shared_ptr<Entity> e) {
     int n = e->cShape->circle.getPointCount();
     std::vector<std::pair<float, float> > direction = {{-1, -1}, {-1, 1}, {1, -1}, {1, 1}};
 
-    for (size_t i = 0; i < n; i++) {
+    size_t i = 0;
+    for (i = 0; i < n; i++) {
         auto smallE = m_entities.addEntity("smallEnemy");
         smallE->cTransform = std::make_shared<CTransform>(e->cTransform->pos, Vec2(3.f * direction[i % 4].first, 3.f * direction[i % 4].second), 0.0f);
         smallE->cShape = std::make_shared<CShape>(m_enemyConfig.SR / 2.f, n, e->cShape->circle.getFillColor(), e->cShape->circle.getOutlineColor(), m_enemyConfig.OT);
-        smallE->cCollision = std::make_shared<CCollision>(m_enemyConfig.CR);
+        smallE->cCollision = std::make_shared<CCollision>(e->cCollision->radius);
         smallE->cLifespan = std::make_shared<CLifespan>(m_enemyConfig.L);
     }
 }
@@ -287,6 +290,16 @@ void Game::sMovement() {
 
         e->cShape->circle.setPosition({e->cTransform->pos.x, e->cTransform->pos.y});
     }
+
+    // remove any entities which is out of screen
+    for (auto e : m_entities.getEntities()) {
+        if (e->cTransform->pos.x > m_wWidth * 2.f || e->cTransform->pos.x < -2.f * m_wWidth) {
+            e->destroy();
+        }
+        if (e->cTransform->pos.y > m_wHeight * 2.f || e->cTransform->pos.y < -2.f * m_wHeight) {
+            e->destroy();
+        }
+    }
 }
 
 void Game::sLifespan() {
@@ -323,7 +336,25 @@ void Game::sLifespan() {
 void Game::sCollision() {
     // TODO: implement all proper collisions between entities
     // be sure to use the collision radius, not the shape radius
-    // sample
+
+    // collision check between player and enemies or small Enemies
+    for (auto enemy: m_entities.getEntities("enemy")) {
+        if (enemy->isActive()) {
+            // dist. between the centers of the 2 circles
+            float centerDist = m_player->cTransform->pos.distSquare(enemy->cTransform->pos);
+            // std::cerr << "Center dist: " << centerDist << '\n';
+            float radiusSum = m_player->cCollision->radius + enemy->cCollision->radius;
+            if (centerDist < (radiusSum * radiusSum)) {
+                // destroy enemy and spawn small enemies
+                std::cerr << "Player collided with Enemy " << enemy->id() << '\n';
+                // re-spawn palyer at middle of screen                
+                m_player->cTransform->pos = Vec2({m_wWidth / 2.f, m_wHeight / 2.f});
+
+                enemy->destroy();
+                m_score -= m_playerConfig.PD;
+            }
+        }
+    }
 
     // collision check between bullet and enemy
     for (auto bullet: m_entities.getEntities("bullet")) {
@@ -362,10 +393,7 @@ void Game::sCollision() {
         }
     }
 
-    sf::Vector2u size = m_window.getSize();
-    auto [wWidth, wHeight] = size;
-
-    // enemies colliding with walls
+    // entities colliding with walls
     auto allEntities = m_entities.getEntities();
     for (auto e: allEntities)
     {   
@@ -379,21 +407,21 @@ void Game::sCollision() {
             if (e->cTransform->pos.x - e->cCollision->radius < 0) {
                 e->cTransform->pos.x += std::max(0.f, e->cTransform->velocity.x);
             }    
-            if (e->cTransform->pos.x + e->cCollision->radius > (float)wWidth) {
-                e->cTransform->pos.x -= std::min((float)wWidth - e->cCollision->radius, e->cTransform->velocity.x);
+            if (e->cTransform->pos.x + e->cCollision->radius > (float)m_wWidth) {
+                e->cTransform->pos.x -= std::min((float)m_wWidth - e->cCollision->radius, e->cTransform->velocity.x);
             }
             if (e->cTransform->pos.y - e->cCollision->radius < 0) {
                 e->cTransform->pos.y += std::max(0.f, e->cTransform->velocity.y);
             }        
-            if (e->cTransform->pos.y + e->cCollision->radius > (float)wHeight) {
-                e->cTransform->pos.y -= std::min((float)wHeight - e->cCollision->radius, e->cTransform->velocity.y);
+            if (e->cTransform->pos.y + e->cCollision->radius > (float)m_wHeight) {
+                e->cTransform->pos.y -= std::min((float)m_wHeight - e->cCollision->radius, e->cTransform->velocity.y);
             }
             continue;
         }
-        if (e->cTransform->pos.x - e->cCollision->radius < 0 || e->cTransform->pos.x + e->cCollision->radius > (float)wWidth) {
+        if (e->cTransform->pos.x - e->cCollision->radius < 0 || e->cTransform->pos.x + e->cCollision->radius > (float)m_wWidth) {
             e->cTransform->velocity.x *= -1;
         }
-        if (e->cTransform->pos.y - e->cCollision->radius < 0 || e->cTransform->pos.y + e->cCollision->radius > (float)wHeight) {
+        if (e->cTransform->pos.y - e->cCollision->radius < 0 || e->cTransform->pos.y + e->cCollision->radius > (float)m_wHeight) {
             e->cTransform->velocity.y *= -1;
         }
 
@@ -474,6 +502,9 @@ void Game::sGUI() {
                             {
                                 e->destroy();
                             }
+                            ImGui::SameLine();
+                            std::string posStr = "( " + std::to_string(e->cTransform->pos.x) + ", " + std::to_string(e->cTransform->pos.y) + ")";
+                            ImGui::Text(posStr.c_str());
                         }
                     }  
                 } 
@@ -484,9 +515,15 @@ void Game::sGUI() {
             {
                 // Content placed here only shows when the header is open
                 for (auto e : m_entities.getEntities()) {
-                    std::string str = std::to_string(e->id()) + " " + e->tag();
-                    const char* const_res = str.c_str();
-                    ImGui::Text(const_res);
+                    // Dynamically builds "D##1", "D##2", etc.
+                    std::string buttonId = std::format("Delete {}{}", e->id(), e->id());  
+                    if (e->isActive() && ImGui::Button(buttonId.c_str())) 
+                    {
+                        e->destroy();
+                    }
+                    ImGui::SameLine();
+                    std::string posStr = "( " + std::to_string(e->cTransform->pos.x) + ", " + std::to_string(e->cTransform->pos.y) + ")";
+                    ImGui::Text(posStr.c_str());
                 }
             }
             ImGui::EndTabItem();
@@ -500,8 +537,6 @@ void Game::sGUI() {
 }
 
 void Game::sRender() {
-    // TODO: change the code below to draw ALL of the entities
-    // sample drawing of the player Entity that we have created
     m_window.clear();
 
     // draw the entity's sf::CircleShape
@@ -515,18 +550,23 @@ void Game::sRender() {
         }
         m_window.draw(e->cShape->circle);
     }
-    // render text
-    sf::Text m_text(m_font);
+    // score text
+    sf::Text scoreText(m_font);
     std::string scoreStr = std::to_string(m_score);
-    // set the string to display
-    m_text.setString("Score: " + scoreStr);
+    scoreText.setString("Score: " + scoreStr);
+    scoreText.setCharacterSize(m_textSize); // in pixels, not points!
+    scoreText.setFillColor(sf::Color(m_textR, m_textG, m_textB));
+    
+    sf::Text isPausedText(m_font);
+    isPausedText.setPosition({m_wWidth - 110.f, 8.f});
+    isPausedText.setString("Paused");
+    isPausedText.setCharacterSize(m_textSize); // in pixels, not points!
+    isPausedText.setFillColor(sf::Color(m_textR, m_textG, m_textB));
 
-    // set the character size
-    m_text.setCharacterSize(m_textSize); // in pixels, not points!
-
-    // set the color
-    m_text.setFillColor(sf::Color(m_textR, m_textG, m_textB));
-    m_window.draw(m_text);
+    m_window.draw(scoreText);
+    if (m_pause) {
+        m_window.draw(isPausedText);
+    }
 
     // draw the ui last
     ImGui::SFML::Render(m_window);
@@ -568,6 +608,10 @@ void Game::sUserInput() {
 
                 case sf::Keyboard::Key::P:
                     // pause game
+                    m_pause = !m_pause;
+                    m_isMovementActive = !m_isMovementActive;
+                    m_isSpawningActive = !m_isSpawningActive;
+                    m_isLifespanActive = !m_isLifespanActive;
                     break;
 
                 default:

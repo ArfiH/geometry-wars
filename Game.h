@@ -10,7 +10,7 @@
 
 
 struct PlayerConfig {
-    int SR, CR, FR, FG, FB, OR, OG, OB, OT, V, SE, SSE;
+    int SR, CR, FR, FG, FB, OR, OG, OB, OT, V, SE, SSE, PD;
     float S;
 };
 struct EnemyConfig {
@@ -44,7 +44,10 @@ class Game {
     bool m_isMovementActive = true;
     bool m_isCollisionActive = true;
     bool m_isSpawningActive = true;
+    bool m_isLifespanActive = true;
     int m_lastEnemySpawnTime;
+    unsigned int m_wWidth = 0;
+    unsigned int m_wHeight = 0;
 
     void init(const std::string &path);
 
