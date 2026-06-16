@@ -35,28 +35,32 @@ void EntityManager::removeDeadEntities(EntityVec &vec) {
     // TODO: remove all dead entities from the input vector
     // this is called by the update() function
 
-    int removeCnt = 0;
-    size_t i = 0;
-    for (auto& e: vec)
-    {
-        // if e is dead, remove it from vec
-        if (!e->isActive())
-        {
-            // remove the item and put the last item of that vector in its place
-            if (vec.size() > 0) {
-                vec[i] = vec.back();
-            }
-            removeCnt++;
-            std::cerr << "Deleted " << e->tag() << ' ' << e->id() << " from input vec\n";
-        }
-        i++;
-    }
+    // int removeCnt = 0;
+    // size_t i = 0;
+    // for (auto& e: vec)
+    // {
+    //     // if e is dead, remove it from vec
+    //     if (!e->isActive())
+    //     {
+    //         // remove the item and put the last item of that vector in its place
+    //         if (vec.size() > 0) {
+    //             vec[i] = vec.back();
+    //         }
+    //         removeCnt++;
+    //         std::cerr << "Deleted " << e->tag() << ' ' << e->id() << " from input vec\n";
+    //     }
+    //     i++;
+    // }
 
-    // pop_back() removeCnt times
-    while (vec.size() > 0 && removeCnt) {
-        vec.pop_back();
-        removeCnt--;
-    }
+    // // pop_back() removeCnt times
+    // while (vec.size() > 0 && removeCnt) {
+    //     vec.pop_back();
+    //     removeCnt--;
+    // }
+    
+    std::erase_if(vec, [](std::shared_ptr<Entity> e) { 
+        return (!e->isActive()); 
+    });
 }
 
 std::shared_ptr<Entity> EntityManager::addEntity(const std::string &tag) {

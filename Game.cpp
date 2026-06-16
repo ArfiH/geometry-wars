@@ -232,6 +232,13 @@ void Game::sMovement() {
     // sample:
 
     // player movement speed update
+    int inputCnt = m_player->cInput->up + m_player->cInput->down + m_player->cInput->left + m_player->cInput->right;
+    if (inputCnt > 1) {
+        m_player->cTransform->velocity = Vec2(0.707f, 0.707f) * m_playerConfig.S;
+    }
+    else {
+        m_player->cTransform->velocity = Vec2(1.f, 1.f) * m_playerConfig.S;
+    }
     if (m_player->cInput->up) {
         m_player->cTransform->pos.y -= std::abs(m_player->cTransform->velocity.y);
         m_player->cInput->up = false;
