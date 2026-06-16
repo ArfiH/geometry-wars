@@ -40,7 +40,6 @@ void EntityManager::removeDeadEntities(EntityVec &vec) {
     for (auto e: m_entities)
     {
         // if e is dead, remove it from m_entities
-        // if e is dead, remove it from m_entityMap[e->tag()]
         if (!e->isActive())
         {
             // remove the item and put the last item of that vector in its place
@@ -56,6 +55,33 @@ void EntityManager::removeDeadEntities(EntityVec &vec) {
         m_entities.pop_back();
         removeCnt--;
     }
+
+
+    // if e is dead, remove it from m_entityMap[e->tag()]
+    // remove from entityMap as well
+    removeCnt = 0;
+    const char* allTags[] = {"player", "enemy", "smallEnemy", "bullet"};
+    for (size_t k = 0; k < sizeof(allTags) / sizeof(allTags[0]); k++) { 
+        size_t j = 0;
+        for (auto entity : m_entityMap[allTags[k]]) {
+            if (!entity->isActive())
+            {
+                if (m_entityMap[allTags[k]].size() > 0) {
+                    m_entityMap[allTags[k]][j] = m_entityMap[allTags[k]].back();
+                    removeCnt++;
+                    std::cerr << "Deleted " << entity->tag() << ' ' << entity->id() << " from entitiesMap\n";
+                }
+            }
+            j++;
+            
+        }
+
+        // pop_back() removeCnt times
+        while (m_entityMap[allTags[k]].size() > 0 && removeCnt) {
+            m_entityMap[allTags[k]].pop_back();
+            removeCnt--;
+        }
+    }
 }
 
 std::shared_ptr<Entity> EntityManager::addEntity(const std::string &tag) {
@@ -65,7 +91,7 @@ std::shared_ptr<Entity> EntityManager::addEntity(const std::string &tag) {
     // return the shared pointer pointing to that entity
     auto e = std::shared_ptr<Entity>(new Entity(m_totalEntities++, tag));
     m_entitiesToAdd.push_back(e);
-    m_entityMap[tag].push_back(e);
+    // m_entityMap[tag].push_back(e);
     return e;
 
     // auto entity = std::shared_ptr<Entity>(new Entity(m_totalEntities++, tag));

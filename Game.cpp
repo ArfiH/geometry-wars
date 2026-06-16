@@ -67,9 +67,9 @@ void Game::init(const std::string &path) {
         return;
     }
 
-    // scale the imgui ui and text size by 2
-    ImGui::GetStyle().ScaleAllSizes(2.0f);
-    ImGui::GetIO().FontGlobalScale = 2.0f;
+    // // scale the imgui ui and text size by 2
+    // ImGui::GetStyle().ScaleAllSizes(2.0f);
+    // ImGui::GetIO().FontGlobalScale = 2.0f;
 
     spawnPlayer();
     // spawnEnemy();
@@ -93,12 +93,18 @@ void Game::run() {
         // required update call to imgui
         // ImGui::SFML::Update(m_window, m_deltaClock.restart());
 
-        sEnemySpawner();
+        if (m_isSpawningActive) {
+            sEnemySpawner();
+        }
         if (m_isMovementActive) {
             sMovement();
         }
+
         sGUI();
-        sCollision();
+        
+        if (m_isCollisionActive) {
+            sCollision();
+        }
         sUserInput();
         sLifespan();
         sRender();
@@ -416,21 +422,68 @@ void Game::sGUI() {
             }
 
             // Collision
-            // Spawning
-            // Spawn interval
-            // Manual Spawn
+            if (ImGui::Checkbox("Collision", &m_isCollisionActive)) 
+            {
+                std::cerr << "Checkbox toggled! New state: " << m_isCollisionActive << "\n";
+            }
             
+            // Spawning
+            if (ImGui::Checkbox("Spawning", &m_isSpawningActive)) 
+            {
+                std::cerr << "Checkbox toggled! New state: " << m_isSpawningActive << "\n";
+            }
+
+            // Spawn interval
+            // Render the integer slider inside your ImGui window loop
+            if (ImGui::SliderInt("Spawn Interval", &m_enemyConfig.SI, 40, 120)) 
+            {
+                // This code runs ONLY on the frame the user changes the slider value
+                std::cerr << "Spawn interval changed to: " << m_enemyConfig.SI << '\n';
+            }
+
+            // Manual Spawn
+            if (ImGui::Button("Manual Spawn")) 
+            {
+                // This code executes only on the frame the user clicks the button
+                spawnEnemy();
+            }
+
             ImGui::EndTabItem();
         }
 
         // Second Tab
         if (ImGui::BeginTabItem("Entity Manager")) 
         {
-            ImGui::Text("Entities");
-            
+            // ImGui::Text("Entities");
             // Entities by Tag
-            // All entities
+            if (ImGui::CollapsingHeader("Entities by Tag")) 
+            {
+                const char* allTags[] = {"player", "smallEnemy", "enemy", "bullet"};
+                for (size_t i = 0; i < sizeof(allTags) / sizeof(allTags[0]); i++) { 
+                    if (ImGui::CollapsingHeader(allTags[i])) 
+                    {
+                        for (auto e : m_entities.getEntities(allTags[i])) {
+                            // Dynamically builds "D##1", "D##2", etc.
+                            std::string buttonId = std::format("Delete {}{}", allTags[i], e->id());  
+                            if (e->isActive() && ImGui::Button(buttonId.c_str())) 
+                            {
+                                e->destroy();
+                            }
+                        }
+                    }  
+                } 
+            }
 
+            // All entities
+            if (ImGui::CollapsingHeader("All entities")) 
+            {
+                // Content placed here only shows when the header is open
+                for (auto e : m_entities.getEntities()) {
+                    std::string str = std::to_string(e->id()) + " " + e->tag();
+                    const char* const_res = str.c_str();
+                    ImGui::Text(const_res);
+                }
+            }
             ImGui::EndTabItem();
         }
 
