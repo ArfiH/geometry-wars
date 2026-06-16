@@ -190,10 +190,17 @@ void Game::spawnSmallEnemies(std::shared_ptr<Entity> e) {
     int n = e->cShape->circle.getPointCount();
     std::vector<std::pair<float, float> > direction = {{-1, -1}, {-1, 1}, {1, -1}, {1, 1}};
 
-    size_t i = 0;
-    for (i = 0; i < n; i++) {
+    const float pi = 3.141592; 
+    
+    for (size_t i = 0; i < n; i++) {
+        float angle = (360.f / n) * i;
+        float theta = angle * (pi / 180.0f);
+        // Compute the sine value
+        float resultX = std::cos(theta);
+        float resultY = std::sin(theta);
+
         auto smallE = m_entities.addEntity("smallEnemy");
-        smallE->cTransform = std::make_shared<CTransform>(e->cTransform->pos, Vec2(3.f * direction[i % 4].first, 3.f * direction[i % 4].second), 0.0f);
+        smallE->cTransform = std::make_shared<CTransform>(e->cTransform->pos, Vec2(resultX, resultY) * 3.f, 0.0f);
         smallE->cShape = std::make_shared<CShape>(m_enemyConfig.SR / 2.f, n, e->cShape->circle.getFillColor(), e->cShape->circle.getOutlineColor(), m_enemyConfig.OT);
         smallE->cCollision = std::make_shared<CCollision>(e->cCollision->radius);
         smallE->cLifespan = std::make_shared<CLifespan>(m_enemyConfig.L);
@@ -344,8 +351,27 @@ void Game::sCollision() {
     // TODO: implement all proper collisions between entities
     // be sure to use the collision radius, not the shape radius
 
-    // collision check between player and enemies or small Enemies
+    // collision check between player and enemies
     for (auto enemy: m_entities.getEntities("enemy")) {
+        if (enemy->isActive()) {
+            // dist. between the centers of the 2 circles
+            float centerDist = m_player->cTransform->pos.distSquare(enemy->cTransform->pos);
+            // std::cerr << "Center dist: " << centerDist << '\n';
+            float radiusSum = m_player->cCollision->radius + enemy->cCollision->radius;
+            if (centerDist < (radiusSum * radiusSum)) {
+                // destroy enemy and spawn small enemies
+                std::cerr << "Player collided with Enemy " << enemy->id() << '\n';
+                // re-spawn palyer at middle of screen                
+                m_player->cTransform->pos = Vec2({m_wWidth / 2.f, m_wHeight / 2.f});
+
+                enemy->destroy();
+                m_score -= m_playerConfig.PD;
+            }
+        }
+    }
+
+    // collision check between player and small Enemies
+    for (auto enemy: m_entities.getEntities("smallEnemy")) {
         if (enemy->isActive()) {
             // dist. between the centers of the 2 circles
             float centerDist = m_player->cTransform->pos.distSquare(enemy->cTransform->pos);
