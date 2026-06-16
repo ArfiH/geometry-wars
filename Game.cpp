@@ -229,8 +229,30 @@ void Game::spawnBullet(std::shared_ptr<Entity> entity, const Vec2 &target) {
     bullet->cTransform->velocity.y = BULLET_SPEED * normalizedVelocity.y;
 }
 
-void Game::spawnSpecialWeapon(std::shared_ptr<Entity> entity) {
-    // TODO: implement your own special weapon
+void Game::spawnSpecialWeapon() {
+    const int SPECIAL_SPEED = 5;
+    auto special = m_entities.addEntity("special");
+    special->cTransform = std::make_shared<CTransform>(m_player->cTransform->pos, Vec2(5.f, 5.f), 0.f);
+    special->cShape = std::make_shared<CShape>(10.f, 3, sf::Color::Red, sf::Color::White, 0.01f);
+    special->cCollision = std::make_shared<CCollision>(10.f);
+
+    // Move to point to target nearest enemy
+    auto enemyVec = m_entities.getEntities("enemy");
+    if (enemyVec.size() > 0) {    
+        auto e = enemyVec.back();
+        special->cFollow = std::make_shared<CFollow>(e->cTransform->pos);
+
+        // change angle to point to nearest enemy
+        // originate the bullet from the center of entity and move towards nearest enemy
+        // Vec2 normalizedVelocity = e->cTransform->pos;
+        // normalizedVelocity -= special->cTransform->pos;
+        // normalizedVelocity /= normalizedVelocity.length();
+        
+        // special->cTransform->angle = atan2f(normalizedVelocity.y, normalizedVelocity.x);
+        // special->cTransform->velocity.x = SPECIAL_SPEED * normalizedVelocity.x;
+        // special->cTransform->velocity.y = SPECIAL_SPEED * normalizedVelocity.y;
+        // e->cShape->circle.setPosition({e->cTransform->pos.x, e->cTransform->pos.y});
+    }
 }
 
 void Game::sMovement() {
@@ -303,6 +325,33 @@ void Game::sMovement() {
         e->cTransform->pos.y += e->cTransform->velocity.y;
 
         e->cShape->circle.setPosition({e->cTransform->pos.x, e->cTransform->pos.y});
+    }
+
+    // special bullet movement
+    for (auto e : m_entities.getEntities("special")) {
+        const int SPECIAL_SPEED = 5;
+        auto enemyVec = m_entities.getEntities("enemy");
+        if (enemyVec.size() > 0) {
+            auto enemy = enemyVec.back();
+
+            // change angle to point to nearest enemy
+            Vec2 normalizedVelocity = enemy->cTransform->pos;
+            normalizedVelocity -= e->cTransform->pos;
+            normalizedVelocity /= normalizedVelocity.length();
+
+            // Point to the direction of nearest enemy
+            e->cTransform->angle = atan2f(normalizedVelocity.y, normalizedVelocity.x);
+
+            // move towards nearest enemy
+            e->cTransform->velocity.x = SPECIAL_SPEED * normalizedVelocity.x;
+            e->cTransform->velocity.y = SPECIAL_SPEED * normalizedVelocity.y;
+            e->cTransform->pos.x += e->cTransform->velocity.x;
+            e->cTransform->pos.y += e->cTransform->velocity.y;
+            e->cShape->circle.setPosition({e->cTransform->pos.x, e->cTransform->pos.y});
+        }
+        else {
+            e->destroy();
+        }
     }
 
     // remove any entities which is out of screen
@@ -418,6 +467,43 @@ void Game::sCollision() {
                 if (centerDist < (radiusSum * radiusSum)) {
                     // destroy enemy and spawn small enemies
                     std::cerr << "Bullet " << bullet->id() << " collided with Small enemy " << entities->id() << '\n';
+                    bullet->destroy();
+                    entities->destroy();
+                    m_score += m_playerConfig.SSE;
+                }
+            }
+        }
+    }
+
+    // collision check between special bullet and enemy
+    for (auto bullet: m_entities.getEntities("special")) {
+        for (auto entities: m_entities.getEntities("enemy")) {
+            if (bullet->isActive() && entities->isActive()) {
+                // dist. between the centers of the 2 circles
+                float centerDist = bullet->cTransform->pos.distSquare(entities->cTransform->pos);
+                // std::cerr << "Center dist: " << centerDist << '\n';
+                float radiusSum = m_bulletConfig.CR + entities->cCollision->radius;
+                if (centerDist < (radiusSum * radiusSum)) {
+                    // destroy enemy and spawn small enemies
+                    std::cerr << "Special Bullet " << bullet->id() << " collided with Enemy " << entities->id() << '\n';
+                    bullet->destroy();
+                    entities->destroy();
+                    m_score += m_playerConfig.SE;
+                    spawnSmallEnemies(entities);
+                }
+            }
+        }
+
+        // we need another loop for small entities because small entities don't spawn further
+        for (auto entities: m_entities.getEntities("smallEnemy")) {
+            if (bullet->isActive() && entities->isActive()) {
+                // dist. between the centers of the 2 circles
+                float centerDist = bullet->cTransform->pos.distSquare(entities->cTransform->pos);
+                // std::cerr << "Center dist: " << centerDist << '\n';
+                float radiusSum = m_bulletConfig.CR + entities->cCollision->radius;
+                if (centerDist < (radiusSum * radiusSum)) {
+                    // destroy enemy and spawn small enemies
+                    std::cerr << "Special Bullet " << bullet->id() << " collided with Small enemy " << entities->id() << '\n';
                     bullet->destroy();
                     entities->destroy();
                     m_score += m_playerConfig.SSE;
@@ -641,7 +727,7 @@ void Game::sUserInput() {
 
                 case sf::Keyboard::Key::P:
                     // pause game
-                    m_pause = !m_pause;
+                    m_pause            = !m_pause;
                     m_isMovementActive = !m_isMovementActive;
                     m_isSpawningActive = !m_isSpawningActive;
                     m_isLifespanActive = !m_isLifespanActive;
@@ -662,6 +748,13 @@ void Game::sUserInput() {
                 sf::Vector2 sfMousePos = sf::Mouse::getPosition(m_window);
                 Vec2 mousePos = Vec2(sfMousePos.x, sfMousePos.y);
                 spawnBullet(m_player, mousePos);
+            }
+
+            if (mousePressed->button == sf::Mouse::Button::Right)
+            {
+                sf::Vector2 sfMousePos = sf::Mouse::getPosition(m_window);
+                Vec2 mousePos = Vec2(sfMousePos.x, sfMousePos.y);
+                spawnSpecialWeapon();
             }
         }
     }

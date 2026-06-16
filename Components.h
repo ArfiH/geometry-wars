@@ -28,10 +28,6 @@ public:
         circle.setOutlineThickness(thickness);
         circle.setOrigin({radius, radius});
     }
-
-    // float getPointCount() const {
-    //     return circle.getPointCount();
-    // }
 };
 
 
@@ -69,6 +65,13 @@ public:
     bool shoot = false;
 
     CInput() = default;
+};
+
+class CFollow {
+public:
+    Vec2 targetPos = {0.0, 0.0};
+    explicit CFollow(const Vec2 &p) : targetPos(p)
+    {}
 };
 
 #endif //COMPONENTS_H
