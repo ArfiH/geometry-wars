@@ -57,7 +57,8 @@ class Game {
     unsigned int m_wHeight = 0;
     unsigned int m_frameLimit = 60;
     unsigned int m_specialCooldownSec = 3;
-    unsigned int m_shieldCooldownSec = 5;
+    unsigned int m_shieldCooldownSec = 3;
+    unsigned int m_shieldTimer = 10;
 
 
     void init(const std::string &path);

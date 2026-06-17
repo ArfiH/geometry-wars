@@ -257,14 +257,27 @@ void Game::spawnSpecialWeapon() {
 }
 
 void Game::spawnShield() {
+    if (m_isShieldActive) {
+        if (m_lastShieldSpawnTime - m_currentFrame > m_shieldTimer) {
+            std::cerr << "Shield is already active\n";
+        }
+        else {
+            std::cerr << "Shield timer up\n";
+            m_shield->destroy();
+            m_isShieldActive = false;
+            // m_lastShieldSpawnTime = m_currentFrame + (m_shieldCooldownSec * m_frameLimit);
+        }
+        return;
+    }
+
     if (m_currentFrame - m_lastShieldSpawnTime < m_frameLimit * m_shieldCooldownSec) {
         int cooldownTimeLeft = m_shieldCooldownSec - ((m_currentFrame - m_lastShieldSpawnTime) / m_frameLimit);
-        std::cerr << "Shield is unavailable\nCooldown time: " << cooldownTimeLeft << '\n';
+        std::cerr << "Shield is unavailable\nShield Cooldown time: " << cooldownTimeLeft << '\n';
         m_isShieldActive = false;
         return;
     }
     // record when the most recent special bullet was spawned
-    m_lastShieldSpawnTime = m_currentFrame;
+    m_lastShieldSpawnTime = m_currentFrame + ((m_shieldTimer + m_shieldCooldownSec) * m_frameLimit);
 
     // add player's shield
     auto shield = m_entities.addEntity("shield");
@@ -394,6 +407,11 @@ void Game::sMovement() {
         if (e->cTransform->pos.y > m_wHeight + MAX_CIRCLE_SIZE || e->cTransform->pos.y < -MAX_CIRCLE_SIZE) {
             e->destroy();
         }
+    }
+
+    // check if shield timer is up
+    if (m_isShieldActive) {
+        spawnShield();
     }
 }
 
@@ -796,14 +814,7 @@ void Game::sUserInput() {
                     break;
 
                 case sf::Keyboard::Key::Space:
-                    // Toggle shield
-                    m_isShieldActive = !m_isShieldActive;
-                    if (m_isShieldActive) {
-                        spawnShield();
-                    }
-                    else {
-                        m_shield->destroy();
-                    }
+                    spawnShield();
                     break;
 
                 default:
