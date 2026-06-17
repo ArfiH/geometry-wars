@@ -32,22 +32,33 @@ class Game {
     EnemyConfig m_enemyConfig;
     BulletConfig m_bulletConfig;
     sf::Clock m_deltaClock;
+    std::shared_ptr<Entity> m_player;
+    std::shared_ptr<Entity> m_shield;
+    
     int m_textSize = 20;
     int m_textR = 0;
     int m_textG = 0;
     int m_textB = 255;    
     int m_score = 0;
     int m_currentFrame = 0;
-    std::shared_ptr<Entity> m_player;
+    int m_lastEnemySpawnTime = 0;
+    int m_lastSpecialSpawnTime = 0;
+    int m_lastShieldSpawnTime = 0;
+    
     bool m_pause = false;
     bool m_running = true;
     bool m_isMovementActive = true;
     bool m_isCollisionActive = true;
     bool m_isSpawningActive = true;
     bool m_isLifespanActive = true;
-    int m_lastEnemySpawnTime;
+    bool m_isShieldActive = false;
+    
     unsigned int m_wWidth = 0;
     unsigned int m_wHeight = 0;
+    unsigned int m_frameLimit = 60;
+    unsigned int m_specialCooldownSec = 3;
+    unsigned int m_shieldCooldownSec = 5;
+
 
     void init(const std::string &path);
 
@@ -71,7 +82,7 @@ public:
     void update();
     void run();
 
-    void setPaused(bool paused);
+    void setPaused();
 
     void spawnPlayer();
 
@@ -82,6 +93,8 @@ public:
     void spawnBullet(std::shared_ptr<Entity> entity, const Vec2 &target);
 
     void spawnSpecialWeapon();
+
+    void spawnShield();
 };
 
 #endif //GAME_H

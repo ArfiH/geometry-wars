@@ -21,14 +21,13 @@ void Game::init(const std::string &path) {
         return;
     }
     
-    unsigned int frameLimit;
     bool isFullscreen = 0;
 
 
     std::string temp;
     while (file >> temp) {
         if (temp == "Window") {
-            file >> m_wWidth >> m_wHeight >> frameLimit;
+            file >> m_wWidth >> m_wHeight >> m_frameLimit;
             file >> isFullscreen;
         }
         else if (temp == "Font") {
@@ -62,7 +61,7 @@ void Game::init(const std::string &path) {
     m_window.create(sf::VideoMode({m_wWidth, m_wHeight}), "Assignment 2", isFullscreen);
 
     // sf::RenderWindow m_window(sf::VideoMode({1280, 720}), "Assignment 2");
-    m_window.setFramerateLimit(frameLimit); // limit frame rate to 60 fps
+    m_window.setFramerateLimit(m_frameLimit); // limit frame rate to 60 fps
 
     // initialize IMGUI and create a clock used for its internal timing
     if (!ImGui::SFML::Init(m_window))
@@ -122,10 +121,11 @@ void Game::run() {
     ImGui::SFML::Shutdown();
 }
 
-void Game::setPaused(bool paused) {
-    m_isMovementActive = paused;
-    m_isSpawningActive = paused;
-    m_isLifespanActive = paused;
+void Game::setPaused() {
+    // if m_pause is true, then movement should be inactive
+    m_isMovementActive = !m_pause;
+    m_isSpawningActive = !m_pause;
+    m_isLifespanActive = !m_pause;
 }
 
 // respawn the player in the middle of the screen
@@ -133,20 +133,11 @@ void Game::spawnPlayer() {
     // We create every entity by calling EntityManager.addEntity(tag)
     // This returns a std::shared_ptr<Entity>, so we use 'auto' to save typing
     auto entity = m_entities.addEntity("player");
-
-    // Give this entity a Transform, so it spawns at (200,200) with velocity (1,1) and angle 0
     entity->cTransform = std::make_shared<CTransform>(Vec2(m_wWidth / 2.f, m_wHeight / 2.f), Vec2(m_playerConfig.S, m_playerConfig.S), 0.0f);
-
-    // The entity's shape will have radius 32, 8 sides, dark grey fill, and red outline of thickness 4
-    // entity->cShape = std::make_shared<CShape>(32.0f, 8, sf::Color(10, 10, 10), sf::Color(255, 0, 0), 4.0f);
-
     entity->cShape = std::make_shared<CShape>(m_playerConfig.SR, m_playerConfig.V, sf::Color(m_playerConfig.FR, m_playerConfig.FG, m_playerConfig.FB), sf::Color(m_playerConfig.OR, m_playerConfig.OG, m_playerConfig.OB), m_playerConfig.OT);
     entity->cCollision = std::make_shared<CCollision>(m_playerConfig.CR);
-    // Add an input component to the player so that we can use inputs
     entity->cInput = std::make_shared<CInput>();
 
-    // Since we want this Entity to be our player, set our Game's player variable to be this Entity
-    // This goes slightly against the EntityManager paradigm, but we use the player so much it's worth it
     m_player = entity;
 }
 
@@ -230,9 +221,17 @@ void Game::spawnBullet(std::shared_ptr<Entity> entity, const Vec2 &target) {
 }
 
 void Game::spawnSpecialWeapon() {
-    const int SPECIAL_SPEED = 5;
+    if (m_currentFrame - m_lastSpecialSpawnTime < m_frameLimit * m_specialCooldownSec) {
+        int cooldownTimeLeft = m_specialCooldownSec - ((m_currentFrame - m_lastSpecialSpawnTime) / m_frameLimit);
+        std::cerr << "Special bullet is unavailable\nCooldown time: " << cooldownTimeLeft << '\n';
+        return;
+    }
+    // record when the most recent special bullet was spawned
+    m_lastSpecialSpawnTime = m_currentFrame;
+
+    const float SPECIAL_SPEED = 8.f;
     auto special = m_entities.addEntity("special");
-    special->cTransform = std::make_shared<CTransform>(m_player->cTransform->pos, Vec2(5.f, 5.f), 0.f);
+    special->cTransform = std::make_shared<CTransform>(m_player->cTransform->pos, Vec2(SPECIAL_SPEED, SPECIAL_SPEED), 0.f);
     special->cShape = std::make_shared<CShape>(m_bulletConfig.SR, 3, sf::Color::Red, sf::Color::White, 0.01f);
     special->cCollision = std::make_shared<CCollision>(m_bulletConfig.CR);
 
@@ -255,6 +254,27 @@ void Game::spawnSpecialWeapon() {
         std::cerr << "No enemy found\n";
         special->destroy();
     }
+}
+
+void Game::spawnShield() {
+    if (m_currentFrame - m_lastShieldSpawnTime < m_frameLimit * m_shieldCooldownSec) {
+        int cooldownTimeLeft = m_shieldCooldownSec - ((m_currentFrame - m_lastShieldSpawnTime) / m_frameLimit);
+        std::cerr << "Shield is unavailable\nCooldown time: " << cooldownTimeLeft << '\n';
+        m_isShieldActive = false;
+        return;
+    }
+    // record when the most recent special bullet was spawned
+    m_lastShieldSpawnTime = m_currentFrame;
+
+    // add player's shield
+    auto shield = m_entities.addEntity("shield");
+    const float SHIELD_SIZE = 1.4f;
+    shield->cTransform = std::make_shared<CTransform>(Vec2(m_wWidth / 2.f, m_wHeight / 2.f), Vec2(m_playerConfig.S, m_playerConfig.S), 0.0f);
+    shield->cShape = std::make_shared<CShape>(m_playerConfig.SR * SHIELD_SIZE, 32, sf::Color(0, 150, 255, 40), sf::Color(0, 200, 255, 200), 3.0f);
+    shield->cCollision = std::make_shared<CCollision>(m_playerConfig.CR);
+    m_shield = shield;
+
+    m_isShieldActive = true;
 }
 
 void Game::sMovement() {
@@ -294,6 +314,11 @@ void Game::sMovement() {
     m_player->cTransform->angle += 3.0f;
     m_player->cShape->circle.setRotation(sf::degrees(m_player->cTransform->angle));
 
+    // set shield position if it is active
+    if (m_isShieldActive) {
+        m_shield->cShape->circle.setPosition({m_player->cTransform->pos.x, m_player->cTransform->pos.y});
+    }
+
     // Move all enemies
     auto enemyEntities = m_entities.getEntities("enemy");
     for (auto e: enemyEntities)
@@ -331,7 +356,7 @@ void Game::sMovement() {
 
     // special bullet movement
     for (auto e : m_entities.getEntities("special")) {
-        const int SPECIAL_SPEED = 5;
+        const float SPECIAL_SPEED = 8.f;
         bool idMatched = false;
 
         // change angle to point to nearest enemy
@@ -361,11 +386,12 @@ void Game::sMovement() {
     }
 
     // remove any entities which is out of screen
+    float MAX_CIRCLE_SIZE = 200.f;
     for (auto e : m_entities.getEntities()) {
-        if (e->cTransform->pos.x > m_wWidth + 200.f || e->cTransform->pos.x < -200.f) {
+        if (e->cTransform->pos.x > m_wWidth + MAX_CIRCLE_SIZE || e->cTransform->pos.x < -MAX_CIRCLE_SIZE) {
             e->destroy();
         }
-        if (e->cTransform->pos.y > m_wHeight + 200.f || e->cTransform->pos.y < -200.f) {
+        if (e->cTransform->pos.y > m_wHeight + MAX_CIRCLE_SIZE || e->cTransform->pos.y < -MAX_CIRCLE_SIZE) {
             e->destroy();
         }
     }
@@ -416,11 +442,18 @@ void Game::sCollision() {
             if (centerDist < (radiusSum * radiusSum)) {
                 // destroy enemy and spawn small enemies
                 std::cerr << "Player collided with Enemy " << enemy->id() << '\n';
-                // re-spawn palyer at middle of screen                
-                m_player->cTransform->pos = Vec2({m_wWidth / 2.f, m_wHeight / 2.f});
+                
+                if (m_isShieldActive == false) {
+                    // re-spawn palyer at middle of screen                
+                    m_player->cTransform->pos = Vec2({m_wWidth / 2.f, m_wHeight / 2.f});
+                    m_score -= m_playerConfig.PD;
+                }
+                else {
+                    // Flicker on Hit
+                    m_score += m_playerConfig.SE;
+                }
 
                 enemy->destroy();
-                m_score -= m_playerConfig.PD;
             }
         }
     }
@@ -435,11 +468,18 @@ void Game::sCollision() {
             if (centerDist < (radiusSum * radiusSum)) {
                 // destroy enemy and spawn small enemies
                 std::cerr << "Player collided with Enemy " << enemy->id() << '\n';
-                // re-spawn palyer at middle of screen                
-                m_player->cTransform->pos = Vec2({m_wWidth / 2.f, m_wHeight / 2.f});
+                
+                if (m_isShieldActive == false) {
+                    // re-spawn palyer at middle of screen                
+                    m_player->cTransform->pos = Vec2({m_wWidth / 2.f, m_wHeight / 2.f});
+                    m_score -= m_playerConfig.PD;
+                }
+                else {
+                    // Flicker on Hit
+                    m_score += m_playerConfig.SSE;
+                }
 
                 enemy->destroy();
-                m_score -= m_playerConfig.PD;
             }
         }
     }
@@ -616,7 +656,7 @@ void Game::sGUI() {
             // Entities by Tag
             if (ImGui::CollapsingHeader("Entities by Tag")) 
             {
-                const char* allTags[] = {"player", "smallEnemy", "enemy", "bullet"};
+                const char* allTags[] = {"player", "smallEnemy", "enemy", "bullet", "special", "shield"};
                 for (size_t i = 0; i < sizeof(allTags) / sizeof(allTags[0]); i++) { 
                     if (ImGui::CollapsingHeader(allTags[i])) 
                     {
@@ -666,7 +706,9 @@ void Game::sRender() {
 
     // draw the entity's sf::CircleShape
     m_window.draw(m_player->cShape->circle);
-    // std::cerr << "Player id: " << m_player->id() << '\n';
+    if (m_isShieldActive) {
+        m_window.draw(m_shield->cShape->circle);
+    }
     
     // draw all active entities
     for (auto e : m_entities.getEntities()) {
@@ -681,17 +723,28 @@ void Game::sRender() {
     scoreText.setString("Score: " + scoreStr);
     scoreText.setCharacterSize(m_textSize); // in pixels, not points!
     scoreText.setFillColor(sf::Color(m_textR, m_textG, m_textB));
+    m_window.draw(scoreText);
     
+    // is game paused text
     sf::Text isPausedText(m_font);
     isPausedText.setPosition({m_wWidth - 110.f, 8.f});
     isPausedText.setString("Paused");
     isPausedText.setCharacterSize(m_textSize); // in pixels, not points!
     isPausedText.setFillColor(sf::Color(m_textR, m_textG, m_textB));
-
-    m_window.draw(scoreText);
-    if (m_pause) {
+    if (m_pause == true) {
         m_window.draw(isPausedText);
     }
+
+    // special cooldown text
+    int cooldownTimeLeft = m_specialCooldownSec - ((m_currentFrame - m_lastSpecialSpawnTime) / m_frameLimit);
+    cooldownTimeLeft = std::max(0, cooldownTimeLeft);
+    sf::Text cooldownText(m_font);
+    cooldownText.setPosition({m_wWidth / 2.f - 20.f, 8.f});
+    std::string cooldownStr = "Cooldown: " + std::to_string(cooldownTimeLeft);
+    cooldownText.setString(cooldownStr);
+    cooldownText.setCharacterSize(m_textSize); // in pixels, not points!
+    cooldownText.setFillColor(sf::Color(m_textR, m_textG, m_textB));
+    m_window.draw(cooldownText);
 
     // draw the ui last
     ImGui::SFML::Render(m_window);
@@ -734,12 +787,23 @@ void Game::sUserInput() {
                 case sf::Keyboard::Key::P:
                     // pause game
                     m_pause = !m_pause;
-                    setPaused(m_pause);
+                    setPaused();
                     break;
 
                 case sf::Keyboard::Key::Q:
                     // Shoot special bullet
                     spawnSpecialWeapon();
+                    break;
+
+                case sf::Keyboard::Key::Space:
+                    // Toggle shield
+                    m_isShieldActive = !m_isShieldActive;
+                    if (m_isShieldActive) {
+                        spawnShield();
+                    }
+                    else {
+                        m_shield->destroy();
+                    }
                     break;
 
                 default:
