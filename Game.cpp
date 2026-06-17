@@ -240,18 +240,10 @@ void Game::spawnSpecialWeapon() {
     auto enemyVec = m_entities.getEntities("enemy");
     if (enemyVec.size() > 0) {    
         auto e = enemyVec.back();
-        special->cFollow = std::make_shared<CFollow>(e->cTransform->pos);
-
-        // change angle to point to nearest enemy
-        // originate the bullet from the center of entity and move towards nearest enemy
-        // Vec2 normalizedVelocity = e->cTransform->pos;
-        // normalizedVelocity -= special->cTransform->pos;
-        // normalizedVelocity /= normalizedVelocity.length();
-        
-        // special->cTransform->angle = atan2f(normalizedVelocity.y, normalizedVelocity.x);
-        // special->cTransform->velocity.x = SPECIAL_SPEED * normalizedVelocity.x;
-        // special->cTransform->velocity.y = SPECIAL_SPEED * normalizedVelocity.y;
-        // e->cShape->circle.setPosition({e->cTransform->pos.x, e->cTransform->pos.y});
+        special->cFollow = std::make_shared<CFollow>(e->id());
+    }
+    else {
+        std::cerr << "No enemy to shoot\n";
     }
 }
 
@@ -330,36 +322,40 @@ void Game::sMovement() {
     // special bullet movement
     for (auto e : m_entities.getEntities("special")) {
         const int SPECIAL_SPEED = 5;
-        auto enemyVec = m_entities.getEntities("enemy");
-        if (enemyVec.size() > 0) {
-            auto enemy = enemyVec.back();
+        bool idMatched = false;
 
-            // change angle to point to nearest enemy
-            Vec2 normalizedVelocity = enemy->cTransform->pos;
-            normalizedVelocity -= e->cTransform->pos;
-            normalizedVelocity /= normalizedVelocity.length();
+        // change angle to point to nearest enemy
+        Vec2 normalizedVelocity = Vec2(0, 0);
+        for (auto enemy : m_entities.getEntities("enemy")) {
+            if (e->cFollow->enemyId == enemy->id()) {
+                idMatched = true;
 
-            // Point to the direction of nearest enemy
-            e->cTransform->angle = atan2f(normalizedVelocity.y, normalizedVelocity.x);
+                normalizedVelocity = enemy->cTransform->pos;
+                normalizedVelocity -= e->cTransform->pos;
+                normalizedVelocity /= normalizedVelocity.length();
 
-            // move towards nearest enemy
-            e->cTransform->velocity.x = SPECIAL_SPEED * normalizedVelocity.x;
-            e->cTransform->velocity.y = SPECIAL_SPEED * normalizedVelocity.y;
-            e->cTransform->pos.x += e->cTransform->velocity.x;
-            e->cTransform->pos.y += e->cTransform->velocity.y;
-            e->cShape->circle.setPosition({e->cTransform->pos.x, e->cTransform->pos.y});
+                // Point to the direction of nearest enemy
+                e->cTransform->angle = atan2f(normalizedVelocity.y, normalizedVelocity.x);
+
+                // move towards nearest enemy
+                e->cTransform->velocity.x = SPECIAL_SPEED * normalizedVelocity.x;
+                e->cTransform->velocity.y = SPECIAL_SPEED * normalizedVelocity.y;
+                e->cTransform->pos.x += e->cTransform->velocity.x;
+                e->cTransform->pos.y += e->cTransform->velocity.y;
+                e->cShape->circle.setPosition({e->cTransform->pos.x, e->cTransform->pos.y});
+            }
         }
-        else {
+        if (!idMatched) {
             e->destroy();
         }
     }
 
     // remove any entities which is out of screen
     for (auto e : m_entities.getEntities()) {
-        if (e->cTransform->pos.x > m_wWidth * 2.f || e->cTransform->pos.x < -2.f * m_wWidth) {
+        if (e->cTransform->pos.x > m_wWidth + 200.f || e->cTransform->pos.x < -200.f) {
             e->destroy();
         }
-        if (e->cTransform->pos.y > m_wHeight * 2.f || e->cTransform->pos.y < -2.f * m_wHeight) {
+        if (e->cTransform->pos.y > m_wHeight + 200.f || e->cTransform->pos.y < -200.f) {
             e->destroy();
         }
     }
@@ -732,6 +728,10 @@ void Game::sUserInput() {
                     m_isSpawningActive = !m_isSpawningActive;
                     m_isLifespanActive = !m_isLifespanActive;
                     break;
+                case sf::Keyboard::Key::Q:
+                    // Shoot special bullet
+                    spawnSpecialWeapon();
+                    break;
 
                 default:
                     break;
@@ -752,9 +752,7 @@ void Game::sUserInput() {
 
             if (mousePressed->button == sf::Mouse::Button::Right)
             {
-                sf::Vector2 sfMousePos = sf::Mouse::getPosition(m_window);
-                Vec2 mousePos = Vec2(sfMousePos.x, sfMousePos.y);
-                spawnSpecialWeapon();
+                // Shoot spread bullet
             }
         }
     }

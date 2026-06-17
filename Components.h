@@ -69,8 +69,8 @@ public:
 
 class CFollow {
 public:
-    Vec2 targetPos = {0.0, 0.0};
-    explicit CFollow(const Vec2 &p) : targetPos(p)
+    size_t enemyId;
+    explicit CFollow(size_t id) : enemyId(id)
     {}
 };
 
