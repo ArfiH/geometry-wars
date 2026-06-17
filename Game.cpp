@@ -94,8 +94,6 @@ void Game::run() {
         m_entitiesToAdd.update();
         m_entities.update();
 
-
-
         // required update call to imgui
         // ImGui::SFML::Update(m_window, m_deltaClock.restart());
 
@@ -125,7 +123,9 @@ void Game::run() {
 }
 
 void Game::setPaused(bool paused) {
-    // TODO
+    m_isMovementActive = paused;
+    m_isSpawningActive = paused;
+    m_isLifespanActive = paused;
 }
 
 // respawn the player in the middle of the screen
@@ -233,17 +233,27 @@ void Game::spawnSpecialWeapon() {
     const int SPECIAL_SPEED = 5;
     auto special = m_entities.addEntity("special");
     special->cTransform = std::make_shared<CTransform>(m_player->cTransform->pos, Vec2(5.f, 5.f), 0.f);
-    special->cShape = std::make_shared<CShape>(10.f, 3, sf::Color::Red, sf::Color::White, 0.01f);
-    special->cCollision = std::make_shared<CCollision>(10.f);
+    special->cShape = std::make_shared<CShape>(m_bulletConfig.SR, 3, sf::Color::Red, sf::Color::White, 0.01f);
+    special->cCollision = std::make_shared<CCollision>(m_bulletConfig.CR);
 
     // Move to point to target nearest enemy
-    auto enemyVec = m_entities.getEntities("enemy");
-    if (enemyVec.size() > 0) {    
-        auto e = enemyVec.back();
-        special->cFollow = std::make_shared<CFollow>(e->id());
+    float minDist = FLT_MAX;
+    size_t minId = -1;
+    for (auto enemy : m_entities.getEntities("enemy")) {
+        Vec2 normalizedVelocity = enemy->cTransform->pos;
+        normalizedVelocity -= special->cTransform->pos;
+        float currDist = normalizedVelocity.length();
+        std::cerr << "Curr dist is " << currDist << '\n';
+        if (currDist < minDist) {
+            minDist = currDist;
+            minId = enemy->id();
+            special->cFollow = std::make_shared<CFollow>(enemy->id());
+        }    
     }
-    else {
-        std::cerr << "No enemy to shoot\n";
+
+    if (minId == -1) {
+        std::cerr << "No enemy found\n";
+        special->destroy();
     }
 }
 
@@ -723,11 +733,10 @@ void Game::sUserInput() {
 
                 case sf::Keyboard::Key::P:
                     // pause game
-                    m_pause            = !m_pause;
-                    m_isMovementActive = !m_isMovementActive;
-                    m_isSpawningActive = !m_isSpawningActive;
-                    m_isLifespanActive = !m_isLifespanActive;
+                    m_pause = !m_pause;
+                    setPaused(m_pause);
                     break;
+
                 case sf::Keyboard::Key::Q:
                     // Shoot special bullet
                     spawnSpecialWeapon();
