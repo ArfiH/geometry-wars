@@ -40,10 +40,6 @@ class Game {
     int m_textG = 0;
     int m_textB = 255;    
     int m_score = 0;
-    int m_currentFrame = 0;
-    int m_lastEnemySpawnTime = 0;
-    int m_lastSpecialSpawnTime = 0;
-    int m_lastShieldSpawnTime = 0;
     
     bool m_pause = false;
     bool m_running = true;
@@ -59,7 +55,10 @@ class Game {
     unsigned int m_specialCooldownSec = 3;
     unsigned int m_shieldCooldownSec = 3;
     unsigned int m_shieldTimer = 10;
-
+    unsigned int m_currentFrame = 0;
+    unsigned int m_lastEnemySpawnTime = 0;
+    unsigned int m_lastSpecialSpawnTime = 0;
+    unsigned int m_lastShieldSpawnTime = 0;
 
     void init(const std::string &path);
 
@@ -92,6 +91,8 @@ public:
     void spawnSmallEnemies(std::shared_ptr<Entity> e);
 
     void spawnBullet(std::shared_ptr<Entity> entity, const Vec2 &target);
+    
+    void spawnSpreadBullet(std::shared_ptr<Entity> entity, const Vec2 &target);
 
     void spawnSpecialWeapon();
 

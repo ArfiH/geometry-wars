@@ -149,10 +149,23 @@ void Game::spawnEnemy() {
 
     auto e = m_entities.addEntity("enemy");
 
-    const int SCREEN_OFFSET = 100;
+    const int SCREEN_OFFSET = 300;
     const int MAX_POINT_COUNT = 8;
     int randomX = (std::rand() % (1280 - SCREEN_OFFSET)) + SCREEN_OFFSET; 
     int randomY = (std::rand() % (720 - SCREEN_OFFSET)) + SCREEN_OFFSET; 
+    
+    // if generated pos is colliding with m_player, then destroy enemy
+    Vec2 enemyPos = Vec2(randomX, randomY);
+    float centerDist = m_player->cTransform->pos.distSquare(enemyPos);
+    // std::cerr << "Center dist: " << centerDist << '\n';
+    float radiusSum = m_player->cCollision->radius + m_enemyConfig.CR;
+    if (centerDist < (radiusSum * radiusSum)) {
+        // destroy enemy and spawn small enemies
+        std::cerr << "Player will collide with enemy " << e->id() << '\n';
+        e->destroy();
+        return;
+    }
+
     int randPointCount = (std::rand() % m_enemyConfig.VMAX) + m_enemyConfig.VMIN;
     float minSpeed = m_enemyConfig.SMIN;
     float maxSpeed = m_enemyConfig.SMAX;
@@ -200,9 +213,6 @@ void Game::spawnSmallEnemies(std::shared_ptr<Entity> e) {
 
 // spawns a bullet from a given entity to a target location
 void Game::spawnBullet(std::shared_ptr<Entity> entity, const Vec2 &target) {
-    // TODO: implement the spawning of a bullet which travels toward target
-    // - bullet speed is given as a scalar speed
-    // - you must set the velocity by using formula in notes
     const int BULLET_SPEED = m_bulletConfig.S;
     auto bullet = m_entities.addEntity("bullet");
     bullet->cTransform = std::make_shared<CTransform>(m_player->cTransform->pos, Vec2(3, 3), 0.f);
@@ -220,6 +230,28 @@ void Game::spawnBullet(std::shared_ptr<Entity> entity, const Vec2 &target) {
     bullet->cTransform->velocity.y = BULLET_SPEED * normalizedVelocity.y;
 }
 
+void Game::spawnSpreadBullet(std::shared_ptr<Entity> entity, const Vec2 &target) {
+    const int BULLET_SPEED = m_bulletConfig.S;
+    const int spreadArr[] = {-40, -20, 0, 20, 40};
+    for (size_t i = 0; i < sizeof(spreadArr) / sizeof(spreadArr[0]); i++) {
+        auto bullet = m_entities.addEntity("bullet");
+        bullet->cTransform = std::make_shared<CTransform>(m_player->cTransform->pos, Vec2(3, 3), 0.f);
+        bullet->cShape = std::make_shared<CShape>(m_bulletConfig.SR, m_bulletConfig.V, sf::Color(m_bulletConfig.FR, m_bulletConfig.FG, m_bulletConfig.FB), sf::Color(m_bulletConfig.OR, m_bulletConfig.OG, m_bulletConfig.OB), 0.0f); 
+        bullet->cCollision = std::make_shared<CCollision>(m_bulletConfig.CR);
+
+        // spread bullet has 50% less lifespan
+        bullet->cLifespan = std::make_shared<CLifespan>(m_bulletConfig.L * 0.5f);
+
+        // originate the bullet from the center of entity and move towards target
+        Vec2 normalizedVelocity = Vec2(target.x + spreadArr[i], target.y + spreadArr[i]);
+        normalizedVelocity -= bullet->cTransform->pos;
+        normalizedVelocity /= normalizedVelocity.length();
+
+        bullet->cTransform->velocity.x = BULLET_SPEED * normalizedVelocity.x;
+        bullet->cTransform->velocity.y = BULLET_SPEED * normalizedVelocity.y;
+    }
+}
+
 void Game::spawnSpecialWeapon() {
     if (m_currentFrame - m_lastSpecialSpawnTime < m_frameLimit * m_specialCooldownSec) {
         int cooldownTimeLeft = m_specialCooldownSec - ((m_currentFrame - m_lastSpecialSpawnTime) / m_frameLimit);
@@ -235,14 +267,14 @@ void Game::spawnSpecialWeapon() {
     special->cShape = std::make_shared<CShape>(m_bulletConfig.SR, 3, sf::Color::Red, sf::Color::White, 0.01f);
     special->cCollision = std::make_shared<CCollision>(m_bulletConfig.CR);
 
-    // Move to point to target nearest enemy
+    // target nearest enemy
     float minDist = FLT_MAX;
     size_t minId = -1;
     for (auto enemy : m_entities.getEntities("enemy")) {
         Vec2 normalizedVelocity = enemy->cTransform->pos;
         normalizedVelocity -= special->cTransform->pos;
         float currDist = normalizedVelocity.length();
-        std::cerr << "Curr dist is " << currDist << '\n';
+        // std::cerr << "Curr dist is " << currDist << '\n';
         if (currDist < minDist) {
             minDist = currDist;
             minId = enemy->id();
@@ -259,13 +291,12 @@ void Game::spawnSpecialWeapon() {
 void Game::spawnShield() {
     if (m_isShieldActive) {
         if (m_lastShieldSpawnTime - m_currentFrame > m_shieldTimer) {
-            std::cerr << "Shield is already active\n";
+            // std::cerr << "Shield is already active\n";
         }
         else {
             std::cerr << "Shield timer up\n";
             m_shield->destroy();
             m_isShieldActive = false;
-            // m_lastShieldSpawnTime = m_currentFrame + (m_shieldCooldownSec * m_frameLimit);
         }
         return;
     }
@@ -277,7 +308,7 @@ void Game::spawnShield() {
         return;
     }
     // record when the most recent special bullet was spawned
-    m_lastShieldSpawnTime = m_currentFrame + ((m_shieldTimer + m_shieldCooldownSec) * m_frameLimit);
+    m_lastShieldSpawnTime = m_currentFrame + ((m_shieldTimer) * m_frameLimit);
 
     // add player's shield
     auto shield = m_entities.addEntity("shield");
@@ -459,7 +490,7 @@ void Game::sCollision() {
             float radiusSum = m_player->cCollision->radius + enemy->cCollision->radius;
             if (centerDist < (radiusSum * radiusSum)) {
                 // destroy enemy and spawn small enemies
-                std::cerr << "Player collided with Enemy " << enemy->id() << '\n';
+                // std::cerr << "Player collided with Enemy " << enemy->id() << '\n';
                 
                 if (m_isShieldActive == false) {
                     // re-spawn palyer at middle of screen                
@@ -468,7 +499,7 @@ void Game::sCollision() {
                 }
                 else {
                     // Flicker on Hit
-                    m_score += m_playerConfig.SE;
+                    m_score += m_playerConfig.SE * enemy->cShape->circle.getPointCount();
                 }
 
                 enemy->destroy();
@@ -485,7 +516,7 @@ void Game::sCollision() {
             float radiusSum = m_player->cCollision->radius + enemy->cCollision->radius;
             if (centerDist < (radiusSum * radiusSum)) {
                 // destroy enemy and spawn small enemies
-                std::cerr << "Player collided with Enemy " << enemy->id() << '\n';
+                // std::cerr << "Player collided with Enemy " << enemy->id() << '\n';
                 
                 if (m_isShieldActive == false) {
                     // re-spawn palyer at middle of screen                
@@ -494,7 +525,7 @@ void Game::sCollision() {
                 }
                 else {
                     // Flicker on Hit
-                    m_score += m_playerConfig.SSE;
+                    m_score += m_playerConfig.SSE * enemy->cShape->circle.getPointCount();
                 }
 
                 enemy->destroy();
@@ -512,10 +543,10 @@ void Game::sCollision() {
                 float radiusSum = m_bulletConfig.CR + entities->cCollision->radius;
                 if (centerDist < (radiusSum * radiusSum)) {
                     // destroy enemy and spawn small enemies
-                    std::cerr << "Bullet " << bullet->id() << " collided with Enemy " << entities->id() << '\n';
+                    // std::cerr << "Bullet " << bullet->id() << " collided with Enemy " << entities->id() << '\n';
                     bullet->destroy();
                     entities->destroy();
-                    m_score += m_playerConfig.SE;
+                    m_score += m_playerConfig.SE * entities->cShape->circle.getPointCount();
                     spawnSmallEnemies(entities);
                 }
             }
@@ -530,10 +561,10 @@ void Game::sCollision() {
                 float radiusSum = m_bulletConfig.CR + entities->cCollision->radius;
                 if (centerDist < (radiusSum * radiusSum)) {
                     // destroy enemy and spawn small enemies
-                    std::cerr << "Bullet " << bullet->id() << " collided with Small enemy " << entities->id() << '\n';
+                    // std::cerr << "Bullet " << bullet->id() << " collided with Small enemy " << entities->id() << '\n';
                     bullet->destroy();
                     entities->destroy();
-                    m_score += m_playerConfig.SSE;
+                    m_score += m_playerConfig.SSE * entities->cShape->circle.getPointCount();
                 }
             }
         }
@@ -549,10 +580,10 @@ void Game::sCollision() {
                 float radiusSum = m_bulletConfig.CR + entities->cCollision->radius;
                 if (centerDist < (radiusSum * radiusSum)) {
                     // destroy enemy and spawn small enemies
-                    std::cerr << "Special Bullet " << bullet->id() << " collided with Enemy " << entities->id() << '\n';
+                    // std::cerr << "Special Bullet " << bullet->id() << " collided with Enemy " << entities->id() << '\n';
                     bullet->destroy();
                     entities->destroy();
-                    m_score += m_playerConfig.SE;
+                    m_score += m_playerConfig.SE * entities->cShape->circle.getPointCount();
                     spawnSmallEnemies(entities);
                 }
             }
@@ -567,10 +598,10 @@ void Game::sCollision() {
                 float radiusSum = m_bulletConfig.CR + entities->cCollision->radius;
                 if (centerDist < (radiusSum * radiusSum)) {
                     // destroy enemy and spawn small enemies
-                    std::cerr << "Special Bullet " << bullet->id() << " collided with Small enemy " << entities->id() << '\n';
+                    // std::cerr << "Special Bullet " << bullet->id() << " collided with Small enemy " << entities->id() << '\n';
                     bullet->destroy();
                     entities->destroy();
-                    m_score += m_playerConfig.SSE;
+                    m_score += m_playerConfig.SSE * entities->cShape->circle.getPointCount();
                 }
             }
         }
@@ -699,7 +730,7 @@ void Game::sGUI() {
                 // Content placed here only shows when the header is open
                 for (auto e : m_entities.getEntities()) {
                     // Dynamically builds "D##1", "D##2", etc.
-                    std::string buttonId = std::format("Delete {}{}", e->id(), e->id());  
+                    std::string buttonId = std::format("Delete {}{}", e->tag(), e->id());  
                     if (e->isActive() && ImGui::Button(buttonId.c_str())) 
                     {
                         e->destroy();
@@ -745,7 +776,7 @@ void Game::sRender() {
     
     // is game paused text
     sf::Text isPausedText(m_font);
-    isPausedText.setPosition({m_wWidth - 110.f, 8.f});
+    isPausedText.setPosition({m_wWidth - 110.f, 6.f});
     isPausedText.setString("Paused");
     isPausedText.setCharacterSize(m_textSize); // in pixels, not points!
     isPausedText.setFillColor(sf::Color(m_textR, m_textG, m_textB));
@@ -754,16 +785,40 @@ void Game::sRender() {
     }
 
     // special cooldown text
-    int cooldownTimeLeft = m_specialCooldownSec - ((m_currentFrame - m_lastSpecialSpawnTime) / m_frameLimit);
-    cooldownTimeLeft = std::max(0, cooldownTimeLeft);
-    sf::Text cooldownText(m_font);
-    cooldownText.setPosition({m_wWidth / 2.f - 20.f, 8.f});
-    std::string cooldownStr = "Cooldown: " + std::to_string(cooldownTimeLeft);
-    cooldownText.setString(cooldownStr);
-    cooldownText.setCharacterSize(m_textSize); // in pixels, not points!
-    cooldownText.setFillColor(sf::Color(m_textR, m_textG, m_textB));
-    m_window.draw(cooldownText);
+    int specialCooldownLeft = m_specialCooldownSec - ((m_currentFrame - m_lastSpecialSpawnTime) / m_frameLimit);
+    specialCooldownLeft = std::max(0, specialCooldownLeft);
+    sf::Text specialCooldownText(m_font);
+    specialCooldownText.setPosition({m_wWidth / 2.f + 150.f, 8.f});
+    std::string specialCooldownStr = "Special Cooldown: " + std::to_string(specialCooldownLeft);
+    specialCooldownText.setString(specialCooldownStr);
+    specialCooldownText.setCharacterSize(m_textSize / 1.5f); // in pixels, not points!
+    specialCooldownText.setFillColor(sf::Color(m_textR, m_textG, m_textB));
+    m_window.draw(specialCooldownText);
 
+    // shield cooldown text
+    int shieldCooldownLeft = m_shieldCooldownSec - ((m_currentFrame - m_lastShieldSpawnTime) / m_frameLimit);
+    shieldCooldownLeft = std::max(0, shieldCooldownLeft);
+    sf::Text shieldCooldownText(m_font);
+    shieldCooldownText.setPosition({m_wWidth / 2.f - 250.f, 8.f});
+    std::string shieldCooldownStr = "Shield Cooldown: " + std::to_string(shieldCooldownLeft);
+    shieldCooldownText.setString(shieldCooldownStr);
+    shieldCooldownText.setCharacterSize(m_textSize / 1.5f); // in pixels, not points!
+    shieldCooldownText.setFillColor(sf::Color(m_textR, m_textG, m_textB));
+    m_window.draw(shieldCooldownText);
+
+    // shield timer text
+    int shieldTimerLeft = (m_lastShieldSpawnTime - m_currentFrame) / m_frameLimit;
+    shieldTimerLeft = std::max(0, shieldTimerLeft);
+    sf::Text shieldTimerText(m_font);
+    shieldTimerText.setPosition({m_wWidth / 2.f - 250.f, 30.f});
+    std::string shieldTimerStr = "Shield Timer: " + std::to_string(shieldTimerLeft);
+    shieldTimerText.setString(shieldTimerStr);
+    shieldTimerText.setCharacterSize(m_textSize / 1.5f); // in pixels, not points!
+    shieldTimerText.setFillColor(sf::Color(m_textR, m_textG, m_textB));
+    if (m_isShieldActive) {
+        m_window.draw(shieldTimerText);
+    }
+    
     // draw the ui last
     ImGui::SFML::Render(m_window);
     m_window.display();
@@ -837,6 +892,9 @@ void Game::sUserInput() {
             if (mousePressed->button == sf::Mouse::Button::Right)
             {
                 // Shoot spread bullet
+                sf::Vector2 sfMousePos = sf::Mouse::getPosition(m_window);
+                Vec2 mousePos = Vec2(sfMousePos.x, sfMousePos.y);
+                spawnSpreadBullet(m_player, mousePos);
             }
         }
     }

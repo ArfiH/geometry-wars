@@ -11,13 +11,10 @@ void EntityManager::update() {
     // - add them to the vector of all entities
     // - add them to the vector inside the map, with the tag as a key
    
-    if (m_entitiesToAdd.size()) {
-        std::cerr << "m_entitiesToAdd's size: " << m_entitiesToAdd.size() << '\n'; 
-    }
     for (auto e: m_entitiesToAdd) {
         m_entities.push_back(e);
         std::string tagStr = e->tag();
-        std::cerr << "Added " << tagStr << '\n'; 
+        // std::cerr << "Added " << tagStr << '\n'; 
         m_entityMap[tagStr].push_back(e);
     }
     m_entitiesToAdd.clear();
